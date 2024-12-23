@@ -128,28 +128,52 @@ class sdcard_class:
 ################################
 class USB_MIDI_Instrument_class:
     # Constructor
-    def __init__(self):            
+    def __init__(self):
+        self.TEST_note = None
+        
+        # Constants                                 Value
+        self.ControlChange_Modulation      =  1		# 0..127
+        self.ControlChange_Sustain         = 64		# 127: On / 0: Off
+        
+        self.ControlChange_Portamento_Time =  5		# 0..127: Portamento time (0 is no effect)
+        self.ControlChange_Portamento      = 65		# 64..127: On / 0..63: Off
+        
+        self.ControlChange_SoftPedal       = 67		# 127: On / 0: Off
+        
+        self.ControlChange_Vibrate_Rate    = 76		# 0(Low Freq)..64(Off)..127(High Freq)
+        self.ControlChange_Vibrate_Depth   = 77		# 0..127
+        self.ControlChange_Vibrate_Delay   = 78		# 0..127
+
+        self.ControlChange_Chorus_Program  = 81		# 0..7
+        self.ControlChange_Chorus_Level    = 93		# 0..127
+        self.ControlChange_Chorus_Feedback = 59		# 0..127
+        self.ControlChange_Chorus_Delay    = 60		# 0..127
+
         # USB MIDI device
         print('USB MIDI:', usb_midi.ports)
         self._usb_midi = [None] * 16
         for channel in list(range(16)):
             self._usb_midi[channel] = adafruit_midi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1], out_channel=channel)
 
+    # MIDI sends to USB as a USB device
     def midi_send(self, midi_msg, channel=0):
-        print('SEND:', channel, midi_msg)
+#        print('SEND:', channel, midi_msg)
         self._usb_midi[channel % 16].send(midi_msg)
-        print('SENT')
+#        print('SENT')
 
-    # MIDI-OUT to UART MIDI
+    # MIDI-OUT for keeping compatobolity to UART version
     def midi_out(self, midi_msg, channel=0):
         self.midi_send(midi_msg, channel)
 
-    def set_note_on(self, note_key, velosity, channel=0):
-        self.midi_send(NoteOn(note_key, velosity, channel=channel), channel)
+    # Send note on
+    def set_note_on(self, note_key, velocity, channel=0):
+        self.midi_send(NoteOn(note_key, velocity, channel=channel), channel)
 
+    # Send note off
     def set_note_off(self, note_key, channel=0):
         self.midi_send(NoteOff(note_key, channel=channel), channel)
 
+    # Send all notes off
     def set_all_notes_off(self, channel=0):
         pass
     
@@ -161,63 +185,81 @@ class USB_MIDI_Instrument_class:
             midi_msg = bytearray([0xF0, 0x41, 0x00, 0x42, 0x12, 0x40, 0x01, 0x35, feedback, 0, 0xF7])
             self.midi_out(midi_msg)
             
-    def set_chorus(self, channel, prog, level, feedback, delay):
-        status_byte = 0xB0 + channel
-        midi_msg = bytearray([status_byte, 0x51, prog, status_byte, 0x5D, level])
-        self.midi_out(midi_msg)
-        if feedback > 0:
-            midi_msg = bytearray([0xF0, 0x41, 0x00, 0x42, 0x12, 0x40, 0x01, 0x3B, feedback, 0, 0xF7])
-            self.midi_out(midi_msg)
+    def set_chorus(self, prog, level, feedback, delay, channel=0):
+        if prog is not None:
+            self.midi_send(ControlChange(self.ControlChange_Chorus_Program,  prog, channel=channel),     channel)
+        if level is not None:
+            self.midi_send(ControlChange(self.ControlChange_Chorus_Level,    level, channel=channel),    channel)
+        if feedback is not None:
+            self.midi_send(ControlChange(self.ControlChange_Chorus_Feedback, feedback, channel=channel), channel)
+        if delay is not None:
+            self.midi_send(ControlChange(self.ControlChange_Chorus_Delay,    delay, channel=channel),    channel)
 
-        if delay > 0:
-            midi_msg = bytearray([0xF0, 0x41, 0x00, 0x42, 0x12, 0x40, 0x01, 0x3C, delay, 0, 0xF7])
-            self.midi_out(midi_msg)
+    def set_vibrate(self, rate, depth, delay, channel=0):
+        if rate is not None:
+            self.midi_send(ControlChange(self.ControlChange_Vibrate_Rate,  rate, channel=channel),  channel)
+        if depth is not None:
+            self.midi_send(ControlChange(self.ControlChange_Vibrate_Depth, depth, channel=channel), channel)
+        if delay is not None:
+            self.midi_send(ControlChange(self.ControlChange_Vibrate_Delay, delay, channel=channel), channel)
 
-    def set_vibrate(self, channel, rate, depth, delay):
-        status_byte = 0xB0 + channel
-        midi_msg = bytearray([status_byte, 0x63, 0x01, 0x62, 0x08, 0x06, rate, status_byte, 0x63, 0x01, 0x62, 0x09, 0x06, depth, status_byte, 0x63, 0x01, 0x62, 0x0A, 0x06, delay])
-        self.midi_out(midi_msg)
-
+    # Send pitch bend value
     def set_pitch_bend(self, value, channel=0):
-        self.midi_send(PitchBend(value), channel)
+        self.midi_send(PitchBend(value, channel=channel), channel)
 
+    # Send program change
     def set_program_change(self, program, channel=0):
-        self.midi_send(ProgramChange(program), channel)
+        self.midi_send(ProgramChange(program, channel=channel), channel)
 
     def set_pitch_bend_range(self, channel, value):
         status_byte = 0xB0 + channel
         midi_msg = bytearray([status_byte, 0x65, 0x00, 0x64, 0x00, 0x06, value & 0x7f])
         self.midi_out(midi_msg)
 
-    def set_modulation_wheel(self, channel, modulation, value):
-        status_byte = 0xB0 + channel
-        midi_msg = bytearray([status_byte, 0x41, 0x00, 0x42, 0x12, 0x40, (0x20 | (channel & 0x0f)), modulation, value, 0x00, 0xF7])
-        self.midi_out(midi_msg)
+    def set_modulation_wheel(self, modulation, value, channel=0):
+        self.midi_send(ControlChange(modulation, value, channel=channel), channel)
+
 
     def do_task(self):
         try:
             pico_led.value = True
             
-            self.set_program_change(random.randint(0, 127), 1)
+            GP18_val = switch_GP18.value
+            print('GP18=', GP18_val)
+            if GP18_val == False:
+                if self.TEST_note is None:
+                    program = random.randint(0, 60)
+                    self.set_program_change(program, 0)                
+                    self.TEST_note = random.randint(60, 84)
 
-            print('NOTE ON')
-            note0 = random.randint(60, 84)
-            note1 = random.randint(60, 84)
+                    print('NOTE0 ON')
+                    pico_led.value = True
+                    self.set_note_on(self.TEST_note, 127, 0)
 
-            self.set_note_on(note0, 127, 0)
-            print('NOTE ON DONE')
-            self.set_pitch_bend(random.randint(0, 2000), 0)
-            sleep(0.5)
+#                print('EFFECT ON')
+#                self.set_pitch_bend(random.randint(0, 2000), 0)
+#                self.set_modulation_wheel(1, 127, 0)
+#                sleep(4.0)
 
-            self.set_note_on(note1, 127, 1)
-            sleep(0.5)
-            
-            print('NOTE OFF')
-            self.set_note_off(note0, 0)
-            sleep(0.5)
-            self.set_note_off(note1, 1)
-            print('DONE')
-            sleep(0.5)
+#                print('NOTE0 and EFFECT OFF')
+#                self.set_note_off(note, 0)
+#                self.set_pitch_bend(0, 0)
+#                self.set_modulation_wheel(1, 0, 0)
+#                self.set_vibrate(64, 0, 0, 0)
+#                self.set_chorus(0, 0, 0, 0, 0)
+#                sleep(1.0)
+
+            else:
+                if self.TEST_note is not None:
+                    self.set_note_off(self.TEST_note, 0)
+                    self.TEST_note = None
+
+#                print('CLAP HANDS')
+#                self.set_program_change(126, 1)
+#                self.set_note_on(note, 127, 1)
+#                sleep(1.0)
+#                self.set_note_off(note, 1)
+#                sleep(1.0)
                 
         except Exception as e:
             led_flush = False
@@ -559,6 +601,7 @@ class Application_class:
 
 def setup():
     global pico_led, sdcard, synth, display, cardkb, view, application
+    global switch_GP18
 
     # LED on board
 #    pico_led = digitalio.DigitalInOut(GP25)
@@ -566,28 +609,31 @@ def setup():
     pico_led.direction = digitalio.Direction.OUTPUT
     pico_led.value = True
 
+    switch_GP18 = digitalio.DigitalInOut(GP18)
+    switch_GP18.direction = digitalio.Direction.INPUT
+
     # OLED SSD1306
-#    print('setup')
-#    try:
-#        print('OLED setup')
-#        i2c1 = I2C(GP7, GP6)		# I2C-1 (SCL, SDA)
-#        display = OLED_SSD1306_class(i2c1, 0x3C, 128, 64)
-#        device_oled = adafruit_ssd1306.SSD1306_I2C(display.width(), display.height(), display.i2c())
-#        display.init_device(device_oled)
-#        display.fill(1)
-#        display.text('PICO SYNTH', 5, 15, 0, 2)
-#        display.text('(C) 2024 S.Ohira', 15, 35, 0)
-#        display.show()
-#        
-#    except:
-#        display = OLED_SSD1306_class(None)
-#        pico_led.value = False
-#        print('ERROR I2C1')
-#        for cnt in list(range(10)):
-#            pico_led.value = False
-#            sleep(0.5)
-#            pico_led.value = True
-#            sleep(1.0)
+    print('setup')
+    try:
+        print('OLED setup')
+        i2c0 = I2C(GP17, GP16)		# I2C-0 (SCL, SDA)
+        display = OLED_SSD1306_class(i2c0, 0x3C, 128, 64)
+        device_oled = adafruit_ssd1306.SSD1306_I2C(display.width(), display.height(), display.i2c())
+        display.init_device(device_oled)
+        display.fill(1)
+        display.text('PicoGuitar', 5, 15, 0, 2)
+        display.text('(C) 2024 S.Ohira', 15, 35, 0)
+        display.show()
+        
+    except:
+        display = OLED_SSD1306_class(None)
+        pico_led.value = False
+        print('ERROR I2C1')
+        for cnt in list(range(10)):
+            pico_led.value = False
+            sleep(0.5)
+            pico_led.value = True
+            sleep(1.0)
 
 #    print('Start application.')
 #    application = Application_class(display)
@@ -607,9 +653,10 @@ def setup():
 if __name__=='__main__':
     # Setup
     pico_led = None
+    switch_GP18 = None
     sdcard = None
     synth = None
-#    display = None
+    display = None
 #    application = None
     setup()
 
