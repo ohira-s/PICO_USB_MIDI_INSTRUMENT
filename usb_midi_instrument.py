@@ -11,12 +11,14 @@
 #   usb_midi_instrument.py (USB device mode program)
 #     0.0.1: 12/21/2024
 #     0.0.2: 12/24/2024
-#            Guitar Code Player test.
+#            Guitar Chrod Player test.
+#     0.0.3: 12/25/2024
+#            Drum Set Player test.
 #########################################################################
 
 from board import *
 import digitalio
-from busio import UART			# for UART MIDI
+#from busio import UART			# for UART MIDI
 from busio import I2C			# for I2C
 from time import sleep
 import os, re
@@ -125,6 +127,70 @@ class sdcard_class:
 ################# End of SD Card Class Definition #################
 
 
+########################
+### OLED SSD1306 class
+########################
+class OLED_SSD1306_class:
+    def __init__(self, i2c, address=0x3C, width=128, height=64):
+        self.available = False
+        self._display = None
+        self._i2c = i2c
+        self.address = address
+        self._width = width
+        self._height = height
+
+    def init_device(self, device):
+        if device is None:
+            return
+        
+        self._display = device
+        self.available = True
+        
+    def is_available(self):
+        return self.available
+
+    def i2c(self):
+        return self._i2c
+    
+    def get_display(self):
+        print('DISPLAT')
+        return self._display
+    
+    def width(self):
+        return self._width
+    
+    def height(self):
+        return self._height
+    
+    def fill(self, color):
+        if self.is_available():
+            self._display.fill(color)
+    
+    def fill_rect(self, x, y, w, h, color):
+        if self.is_available():
+            self._display.fill_rect(x, y, w, h, color)
+
+    def text(self, s, x, y, color=1, disp_size=1):
+        if self.is_available():
+            self._display.text(s, x, y, color, font_name='font5x8.bin', size=disp_size)
+
+    def show_message(self, msg, x=0, y=0, color=1):
+        self._display.fill_rect(x, y, 128, 9, 0 if color == 1 else 1)
+        self._display.text(msg, x, y, color)
+#        self._display.show()
+
+    def show(self):
+        if self.is_available():
+            self._display.show()
+
+    def clear(self, color=0, refresh=True):
+        self.fill(color)
+        if refresh:
+            self.show()
+        
+################# End of OLED SSD1306 Class Definition #################
+
+
 ################################
 ### Unit-MIDI Instrument class
 ################################
@@ -154,6 +220,76 @@ class USB_MIDI_Instrument_class:
         self._usb_midi = [None] * 16
         for channel in list(range(16)):
             self._usb_midi[channel] = adafruit_midi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1], out_channel=channel)
+
+    # Get instrument name
+    def get_instrument_name(self, program, gmbank=0):
+        try:
+#            # SD card file system
+#            f = sdcard.file_open('/SD/SYNTH/MIDIFILE/', 'GM0.TXT', 'r')
+#            prg = -1
+#            for instrument in f:
+#                prg = prg + 1
+#                if prg == program:
+#                    sdcard.file_close()
+#                    return instrument
+#
+#            sdcard.file_close()
+            
+            # PICO internal memory file system
+            with open('SYNTH/MIDIFILE/GM0.TXT', 'r') as f:
+                prg = -1
+                for instrument in f:
+                    prg = prg + 1
+                    if prg == program:
+                        return instrument
+
+        except Exception as e:
+            application.show_message('GM LIST:' + e)
+            for cnt in list(range(5)):
+                pico_led.value = False
+                sleep(0.25)
+                pico_led.value = True
+                sleep(0.5)
+
+            display.clear()
+            application.show_settings()
+
+        return '???'
+
+    # Get drumset name
+    def get_drumset_name(self, program, gmbank=0):
+        try:
+#            # SD card file system
+#            f = sdcard.file_open('/SD/SYNTH/MIDIFILE/', 'DRUMSET.TXT', 'r')
+#            prg = -1
+#            for instrument in f:
+#                prg = prg + 1
+#                if prg == program:
+#                    sdcard.file_close()
+#                    return instrument
+#
+#            sdcard.file_close()
+            
+            # PICO internal memory file system
+            with open('SYNTH/MIDIFILE/DRUMSET.TXT', 'r') as f:
+                prg = 34
+                for instrument in f:
+                    prg = prg + 1
+                    if prg == program:
+                        return instrument
+
+        except Exception as e:
+            application.show_message('DRUMSET LIST:' + e)
+            for cnt in list(range(5)):
+                pico_led.value = False
+                sleep(0.25)
+                pico_led.value = True
+                sleep(0.5)
+
+            display.clear()
+            application.show_settings()
+
+        return '???'
 
     # MIDI sends to USB as a USB device
     def midi_send(self, midi_msg, channel=0):
@@ -226,73 +362,75 @@ class USB_MIDI_Instrument_class:
 ################# End of Unit-MIDI Class Definition #################
 
 
-########################
-### OLED SSD1306 class
-########################
-class OLED_SSD1306_class:
-    def __init__(self, i2c, address=0x3C, width=128, height=64):
-        self.available = False
-        self._display = None
-        self._i2c = i2c
-        self.address = address
-        self._width = width
-        self._height = height
-
-    def init_device(self, device):
-        if device is None:
-            return
-        
-        self._display = device
-        self.available = True
-        
-    def is_available(self):
-        return self.available
-
-    def i2c(self):
-        return self._i2c
-    
-    def get_display(self):
-        print('DISPLAT')
-        return self._display
-    
-    def width(self):
-        return self._width
-    
-    def height(self):
-        return self._height
-    
-    def fill(self, color):
-        if self.is_available():
-            self._display.fill(color)
-    
-    def fill_rect(self, x, y, w, h, color):
-        if self.is_available():
-            self._display.fill_rect(x, y, w, h, color)
-
-    def text(self, s, x, y, color=1, disp_size=1):
-        if self.is_available():
-            self._display.text(s, x, y, color, font_name='font5x8.bin', size=disp_size)
-
-    def show(self):
-        if self.is_available():
-            self._display.show()
-
-    def clear(self, color=0, refresh=True):
-        self.fill(color)
-        if refresh:
-            self.show()
-        
-################# End of OLED SSD1306 Class Definition #################
-
-
-#######################
-### Application class
-#######################
-class Application_class:
+#########################
+### Imput Devices class
+#########################
+class Input_Devices_class:
     def __init__(self, display_obj):
         self._display = display_obj
-        self._channel = 0
         
+        self._device_alias = {}
+        self._device_info = {
+                'BUTTON_1': True, 'BUTTON_2': True, 'BUTTON_3': True, 'BUTTON_4': True,
+                'BUTTON_5': True, 'BUTTON_6': True, 'BUTTON_7': True, 'BUTTON_8': True,
+                'PIEZO_A1': True, 'PIEZO_A2': True, 'PIEZO_A3': True, 'PIEZO_A4': True,
+                'PIEZO_A5': True, 'PIEZO_A6': True, 'PIEZO_A7': True, 'PIEZO_A8': True,
+                'PIEZO_B1': True, 'PIEZO_B2': True, 'PIEZO_B3': True, 'PIEZO_B4': True,
+                'PIEZO_B5': True, 'PIEZO_B6': True, 'PIEZO_B7': True, 'PIEZO_B8': True
+            }
+
+        self.BUTTON_1 = digitalio.DigitalInOut(GP21)
+        self.BUTTON_1.direction = digitalio.Direction.INPUT
+
+        self.BUTTON_2 = digitalio.DigitalInOut(GP20)
+        self.BUTTON_2.direction = digitalio.Direction.INPUT
+
+        self.BUTTON_3 = digitalio.DigitalInOut(GP18)
+        self.BUTTON_3.direction = digitalio.Direction.INPUT
+
+        self.BUTTON_4 = digitalio.DigitalInOut(GP19)
+        self.BUTTON_4.direction = digitalio.Direction.INPUT
+
+    # Device alias names list
+    def device_alias(self, alias_name, device_name=None):
+        if device_name is not None:
+            self._device_alias[alias_name] = device_name
+            
+        return self._device_alias[alias_name]
+
+    # Get a device information
+    def device_info(self, device_name=None, val=None):
+        if device_name is None:
+            return self._device_info
+
+        if not device_name in self._device_info.keys():
+            device_name = self.device_alias(device_name)
+
+        if device_name in self._device_info.keys():
+            if val is not None:
+                self._device_info[device_name] = val
+                
+            return self._device_info[device_name]
+        
+        return None
+
+    # Scan devices to get values
+    def scan_devices(self):
+        self.device_info('BUTTON_1', self.BUTTON_1.value)
+        self.device_info('BUTTON_2', self.BUTTON_2.value)
+        self.device_info('BUTTON_3', self.BUTTON_3.value)
+        self.device_info('BUTTON_4', self.BUTTON_4.value)
+
+################# End of Input Devices Class Definition #################
+
+
+##################
+### Guitar class
+##################
+class Guitar_class:
+    def __init__(self, display_obj):
+        self._display = display_obj
+
         self.PARAM_GUITAR_ROOTs = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
         self.PARAM_GUITAR_CHORDs = ['M', 'M7', '7', '6', 'aug', 'm', 'mM7', 'm7', 'm6', 'm7-5', 'add9', 'sus4', '7sus4', 'dim7']
         self.GUITAR_STRINGS_OPEN = [16,11, 7, 2, -3, -8]	# 1st String: E, B, G, D, A, E: 6th String
@@ -480,14 +618,34 @@ class Application_class:
         }
 
         self.PARAM_ALL = -1
-        self.PARAM_GUITAR_ROOT = 0
-        self.PARAM_GUITAR_CHORD = 1
+        self.PARAM_GUITAR_PROGRAM = 0
+        self.PARAM_GUITAR_ROOT = 1
+        self.PARAM_GUITAR_CHORD = 2
+        
         self.value_guitar_root = 0
         self.value_guitar_chord = 0
         
+        self._program_number = 26  		# Steel Guitar
         self._scale_number = 4
         self._notes_on  = None
         self._notes_off = None
+
+        # Device aliases
+        input_device.device_alias('GUITAR_ROOT_SELECTOR', 'BUTTON_1')
+        input_device.device_alias('GUITAR_CHORD_SELECTOR', 'BUTTON_2')
+        input_device.device_alias('GUITAR_PLAY', 'BUTTON_3')
+        input_device.device_alias('GUITAR_EFFECTOR', 'BUTTON_4')
+
+    def setup(self):
+        display.fill(0)
+        synth.set_program_change(self.program_number(), 0) 
+        self.show_settings(self.PARAM_ALL, 1)
+
+    def program_number(self, prog=None):
+        if prog is not None:
+            self._program_number = prog
+        
+        return self._program_number
 
     def guitar_string_note(self, strings, frets):
         if frets < 0:
@@ -530,55 +688,31 @@ class Application_class:
             note = self.guitar_string_note(strings, fret_map[strings])
             if note is not None:
                 notes.append(note + root)
+            else:
+                notes.append(-1)
             
         return notes
 
-    def show_message(self, msg, x=0, y=0, color=1):
-        self._display.fill_rect(x, y, 128, 9, 0 if color == 1 else 1)
-        self._display.text(msg, x, y, color)
-        self._display.show()
-
-    def channel(self, ch=None):
-        if ch is not None:
-            self._channel = ch % 16
+    def show_settings(self, param, color):
+        if param == self.PARAM_ALL:
+            self._display.show_message('---PICO GUITAR---', 0, 0, color)
             
-        return self._channel
-        
-    def show_settings(self, param=-1):
-        
-        def show_a_parameter_guitar(param, color):
-            if param == self.PARAM_ALL:
-                self.show_message('---PICO GUITAR---', 0, 0, color)
-                
-            if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
-                self.show_message('ROOT : ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 9, color)
-                
-            if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORD:
-                self.show_message('CHORD: ' + self.PARAM_GUITAR_CHORDs[self.value_guitar_chord], 0, 18, color)
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
+            self._display.show_message('PROG : ' + synth.get_instrument_name(self.program_number()), 0, 9, color)
+            
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
+            self._display.show_message('ROOT : ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 18, color)
+            
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORD:
+            self._display.show_message('CHORD: ' + self.PARAM_GUITAR_CHORDs[self.value_guitar_chord], 0, 27, color)
 
-        def show_a_parameter_drum(param, color):
-            pass
-
-        #--- show_settings MAIN ---#
-        show_a_parameter_guitar(param, 1)
         self._display.show()
-
 
     def do_task(self):
         try:
-            GP18_val = switch_GP18.value
-            GP19_val = switch_GP19.value
-            GP20_val = switch_GP20.value
-            GP21_val = switch_GP21.value
-#            print('GP18, 19, 20, 21=', GP18_val, GP19_val, GP20_val, GP21_val)
-            
             # Play a chord selected
-            if GP18_val == False:
+            if input_device.device_info('GUITAR_PLAY') == False:
                 if self._notes_on is None:
-#                    program = random.randint(0, 60)
-#                    synth.set_program_change(program, 0)                
-                    synth.set_program_change(26, 0)   		# Steel Guitar             
-
                     pico_led.value = True                    
                     self._notes_on = self.chord_notes()
                     
@@ -622,7 +756,7 @@ class Application_class:
                     sleep(0.006)
 
             # Effector
-            if GP19_val == False:
+            if input_device.device_info('GUITAR_EFFECTOR') == False:
                 print('EFFECT ON')
                 sleep(0.25)
                 synth.set_pitch_bend( 9000, 0)
@@ -645,16 +779,16 @@ class Application_class:
 #                sleep(1.0)
 
             # Root change
-            if GP21_val == False:
+            if input_device.device_info('GUITAR_ROOT_SELECTOR') == False:
                 print('ROOT CHANGE')
                 self.value_guitar_root = (self.value_guitar_root + 1) % len(self.PARAM_GUITAR_ROOTs)
-                self.show_settings(self.PARAM_GUITAR_ROOT)
+                self.show_settings(self.PARAM_GUITAR_ROOT, 1)
 
             # Chord change
-            if GP20_val == False:
+            if input_device.device_info('GUITAR_CHORD_SELECTOR') == False:
                 print('CHORD CHANGE')
                 self.value_guitar_chord = (self.value_guitar_chord + 1) % len(self.PARAM_GUITAR_CHORDs)
-                self.show_settings(self.PARAM_GUITAR_CHORD)
+                self.show_settings(self.PARAM_GUITAR_CHORD, 1)
                 
         except Exception as e:
             led_flush = False
@@ -670,30 +804,220 @@ class Application_class:
 #            display.text('EXCEPTION: MIDI-IN', 0, 0, 1)
 #            display.show()
 
+################# End of Guitar Class Definition #################
+
+
+################
+### Drum class
+################
+class Drum_class:
+    def __init__(self, display_obj):
+        self._display = display_obj
+
+        self.PARAM_ALL = -1
+        self.PARAM_DRUM_SET1 = 0
+        self.PARAM_DRUM_SET2 = 1
+        self.PARAM_DRUM_SET3 = 2
+        self.PARAM_DRUM_SET4 = 3
+
+        # Device aliases
+        input_device.device_alias('DRUM_1', 'BUTTON_1')
+        input_device.device_alias('DRUM_2', 'BUTTON_2')
+        input_device.device_alias('DRUM_3', 'BUTTON_3')
+        input_device.device_alias('DRUM_4', 'BUTTON_4')
+        
+        self._drum_program = [46, 56, 36, 48]
+        self._drum_on = [-1] * 4
+
+    def setup(self):
+        display.fill(0)
+        self.show_settings(self.PARAM_ALL, 1)
+
+    def show_settings(self, param, color):
+        if param == self.PARAM_ALL:
+            self._display.show_message('---PICO DRUM---', 0, 0, color)
+            
+        if param == self.PARAM_ALL or param == self.PARAM_DRUM_SET1:
+            self._display.show_message('DRUM1: ' + synth.get_drumset_name(self.drum_program(0)), 0, 9, color)
+            
+        if param == self.PARAM_ALL or param == self.PARAM_DRUM_SET2:
+            self._display.show_message('DRUM2: ' + synth.get_drumset_name(self.drum_program(1)), 0, 18, color)
+            
+        if param == self.PARAM_ALL or param == self.PARAM_DRUM_SET3:
+            self._display.show_message('DRUM3: ' + synth.get_drumset_name(self.drum_program(2)), 0, 27, color)
+            
+        if param == self.PARAM_ALL or param == self.PARAM_DRUM_SET4:
+            self._display.show_message('DRUM4: ' + synth.get_drumset_name(self.drum_program(3)), 0, 36, color)
+
+        self._display.show()
+        
+    def drum_program(self, drum_num, prog=None):
+        if prog is not None:
+            self._drum_program[drum_num] = prog
+            
+        return self._drum_program[drum_num]
+
+    def drum_on(self, drum_num, note=None, velosity=127, channel=9):
+        if note is not None:
+            self._drum_on[drum_num] = note
+            synth.set_note_on(note, velosity, channel)
+            
+        return self._drum_on[drum_num]
+
+    def drum_off(self, drum_num, channel=9):
+        synth.set_note_off(self.drum_on(drum_num), channel)
+        self._drum_on[drum_num] = -1
+
+    def do_task(self):
+        try:
+            # Play drum
+            if input_device.device_info('DRUM_1') == False:
+                if self.drum_on(0) == -1:
+                    pico_led.value = True
+                    print('DRUM1 ON')
+                    self.drum_on(0, self.drum_program(0))
+
+            else:
+                if self.drum_on(0) != -1:
+                    self.drum_off(0)
+                    pico_led.value = False                
+                    print('DRUM1 OFF')
+                    sleep(0.001)
+
+            if input_device.device_info('DRUM_2') == False:
+                if self.drum_on(1) == -1:
+                    pico_led.value = True
+                    print('DRUM2 ON')
+                    self.drum_on(1, self.drum_program(1))
+
+            else:
+                if self.drum_on(1) != -1:
+                    self.drum_off(1)
+                    pico_led.value = False                
+                    print('DRUM2 OFF')
+                    sleep(0.001)
+
+            if input_device.device_info('DRUM_3') == False:
+                if self.drum_on(2) == -1:
+                    pico_led.value = True
+                    print('DRUM3 ON')
+                    self.drum_on(2, self.drum_program(2))
+
+            else:
+                if self.drum_on(2) != -1:
+                    self.drum_off(2)
+                    pico_led.value = False                
+                    print('DRUM3 OFF')
+                    sleep(0.001)
+
+            if input_device.device_info('DRUM_4') == False:
+                if self.drum_on(3) == -1:
+                    pico_led.value = True
+                    print('DRUM4 ON')
+                    self.drum_on(3, self.drum_program(3))
+
+            else:
+                if self.drum_on(3) != -1:
+                    self.drum_off(3)
+                    pico_led.value = False                
+                    print('DRUM4 OFF')
+                    sleep(0.001)
+                
+        except Exception as e:
+            led_flush = False
+            for cnt in list(range(5)):
+                pico_led.value = led_flush
+                led_flush = not led_flush
+                sleep(0.5)
+
+            led_flush = False
+            print('EXCEPTION: ', e)
+
+
+################# End of Drum Class Definition #################
+ 
+
+#######################
+### Application class
+#######################
+class Application_class:
+    def __init__(self, display_obj):
+        self._display = display_obj
+        self._channel = 0
+        
+        self.INSTRUMENT_GUITAR = 0
+        self.INSTRUMENT_DRUM = 1
+        self._instrument = self.INSTRUMENT_GUITAR
+
+    def setup(self):
+        instrument = self.instrument()
+        if   instrument == self.INSTRUMENT_GUITAR:
+            instrument_guitar.setup()
+        elif instrument == self.INSTRUMENT_DRUM:
+            instrument_drum.setup()
+
+    def show_message(self, msg, x=0, y=0, color=1):
+        self._display.fill_rect(x, y, 128, 9, 0 if color == 1 else 1)
+        self._display.text(msg, x, y, color)
+        self._display.show()
+
+    def channel(self, ch=None):
+        if ch is not None:
+            self._channel = ch % 16
+            
+        return self._channel
+
+    def instrument(self, inst_num=None):
+        if inst_num is not None:
+            self._instrument = inst_num
+            
+        return self._instrument
+
+    def show_settings(self, param=-1):
+        #--- show_settings MAIN ---#
+        instrument = self.instrument()
+        if   instrument == self.INSTRUMENT_GUITAR:
+            instrument_guitar.show_settings(param, 1)
+#        elif instrument == self.INSTRUMENT_DRUM:
+#            drum.show_settings(param, 1)
+
+#        self._display.show()
+
+
+    def do_task(self):
+        input_device.scan_devices()
+        
+        # Instrument change
+        if input_device.device_info('BUTTON_1') == False and input_device.device_info('BUTTON_2') == False:
+            if   self.instrument() == self.INSTRUMENT_GUITAR:
+                self.instrument(self.INSTRUMENT_DRUM)
+                instrument_drum.setup()
+                
+            elif self.instrument() == self.INSTRUMENT_DRUM:
+                self.instrument(self.INSTRUMENT_GUITAR)
+                instrument_guitar.setup()
+
+            return
+        
+        # Play the current instrument
+        instrument = self.instrument()
+        if   instrument == self.INSTRUMENT_GUITAR:
+            instrument_guitar.do_task()
+        elif instrument == self.INSTRUMENT_DRUM:
+            instrument_drum.do_task()
+
+
 ################# End of Application Class Definition #################
         
 
 def setup():
-    global pico_led, sdcard, synth, display, cardkb, view, application
-    global switch_GP18, switch_GP19, switch_GP20, switch_GP21
+    global pico_led, sdcard, synth, display, input_device, instrument_guitar, instrument_drum, application
 
     # LED on board
 #    pico_led = digitalio.DigitalInOut(GP25)
     pico_led = digitalio.DigitalInOut(LED)
     pico_led.direction = digitalio.Direction.OUTPUT
     pico_led.value = True
-
-    switch_GP18 = digitalio.DigitalInOut(GP18)
-    switch_GP18.direction = digitalio.Direction.INPUT
-
-    switch_GP19 = digitalio.DigitalInOut(GP19)
-    switch_GP19.direction = digitalio.Direction.INPUT
-
-    switch_GP20 = digitalio.DigitalInOut(GP20)
-    switch_GP20.direction = digitalio.Direction.INPUT
-
-    switch_GP21 = digitalio.DigitalInOut(GP21)
-    switch_GP21.direction = digitalio.Direction.INPUT
 
     # OLED SSD1306
     print('setup')
@@ -719,27 +1043,33 @@ def setup():
             pico_led.value = True
             sleep(1.0)
 
+    # USB MIDI Device
+    synth = USB_MIDI_Instrument_class()
+    synth.set_all_notes_off()
+
+    # Input devices
+    input_device = Input_Devices_class(display)
+
+    # Instruments and application
     print('Start application.')
+    instrument_guitar = Guitar_class(display)
+    instrument_drum = Drum_class(display)    
     application = Application_class(display)
 
     # SD card
 #    sdcard = sdcard_class()
 #    sdcard.setup()
 
-    # USB MIDI Device
-    synth = USB_MIDI_Instrument_class()
-    synth.set_all_notes_off()
-
     # Initial screen
     sleep(3.0)
-    display.fill(0)
-    application.show_settings()
+    application.setup()
     pico_led.value = False                    
 
 ######### MAIN ##########
 if __name__=='__main__':
     # Setup
     pico_led = None
+    input_device = None
     switch_GP18 = None
     switch_GP19 = None
     switch_GP20 = None
@@ -747,6 +1077,8 @@ if __name__=='__main__':
     sdcard = None
     synth = None
     display = None
+    instrument_guitar = None
+    instrument_drum = None
     application = None
     setup()
 
