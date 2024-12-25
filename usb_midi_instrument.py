@@ -14,7 +14,12 @@
 #            Guitar Chrod Player test.
 #     0.0.3: 12/25/2024
 #            Drum Set Player test.
+#     0.1.0: 12/25/2024
+#            asyncio to catch pin transitions.
 #########################################################################
+
+import asyncio
+import keypad
 
 from board import *
 import digitalio
@@ -45,6 +50,40 @@ import sdcardio
 import storage
 
 import random
+
+
+#######################################
+# Catch pin transitions in async task
+#######################################
+async def catch_pin_transitions(pin, pin_name, callback_pressed=None, callback_released=None):
+    # Catch pin transition
+    with keypad.Keys((pin,), value_when_pressed=False) as keys:
+        while True:
+            event = keys.events.get()
+            if event:
+                if event.pressed:
+                    print("pin went low")
+                    if callback_pressed is not None:
+                        callback_pressed(pin_name)
+                        
+                elif event.released:
+                    print("pin went high")
+                    if callback_released is not None:
+                        callback_released(pin_name)
+
+            # Gives away process time to the other tasks.
+            # If there is no task, let give back process time to me.
+            await asyncio.sleep(0)
+
+
+led_status = True
+async def led_flush():
+    global led_status
+    while True:
+        led_status = not led_status
+        pico_led.value = led_status
+        await asyncio.sleep(1.0)
+
 
 ###################
 ### SD card class
@@ -379,18 +418,6 @@ class Input_Devices_class:
                 'PIEZO_B5': True, 'PIEZO_B6': True, 'PIEZO_B7': True, 'PIEZO_B8': True
             }
 
-        self.BUTTON_1 = digitalio.DigitalInOut(GP21)
-        self.BUTTON_1.direction = digitalio.Direction.INPUT
-
-        self.BUTTON_2 = digitalio.DigitalInOut(GP20)
-        self.BUTTON_2.direction = digitalio.Direction.INPUT
-
-        self.BUTTON_3 = digitalio.DigitalInOut(GP18)
-        self.BUTTON_3.direction = digitalio.Direction.INPUT
-
-        self.BUTTON_4 = digitalio.DigitalInOut(GP19)
-        self.BUTTON_4.direction = digitalio.Direction.INPUT
-
     # Device alias names list
     def device_alias(self, alias_name, device_name=None):
         if device_name is not None:
@@ -414,13 +441,16 @@ class Input_Devices_class:
         
         return None
 
-    # Scan devices to get values
-    def scan_devices(self):
-        self.device_info('BUTTON_1', self.BUTTON_1.value)
-        self.device_info('BUTTON_2', self.BUTTON_2.value)
-        self.device_info('BUTTON_3', self.BUTTON_3.value)
-        self.device_info('BUTTON_4', self.BUTTON_4.value)
+    # Call from asyncio just after a pin transition catched, never call this directly
+    def button_pressed(self, device_name):
+        self.device_info(device_name, False)
+        application.do_task()
 
+    # Call from asyncio just after a pin transition catched, never call this directly
+    def button_released(self, device_name):
+        self.device_info(device_name, True)
+        application.do_task()
+        
 ################# End of Input Devices Class Definition #################
 
 
@@ -974,19 +1004,15 @@ class Application_class:
         return self._instrument
 
     def show_settings(self, param=-1):
-        #--- show_settings MAIN ---#
         instrument = self.instrument()
         if   instrument == self.INSTRUMENT_GUITAR:
             instrument_guitar.show_settings(param, 1)
-#        elif instrument == self.INSTRUMENT_DRUM:
-#            drum.show_settings(param, 1)
-
-#        self._display.show()
+        elif instrument == self.INSTRUMENT_DRUM:
+            instrument_drum.show_settings(param, 1)
 
 
+    # Application task called from asyncio, never call this directly.
     def do_task(self):
-        input_device.scan_devices()
-        
         # Instrument change
         if input_device.device_info('BUTTON_1') == False and input_device.device_info('BUTTON_2') == False:
             if   self.instrument() == self.INSTRUMENT_GUITAR:
@@ -1065,6 +1091,14 @@ def setup():
     application.setup()
     pico_led.value = False                    
 
+async def main():
+    interrupt_task1 = asyncio.create_task(catch_pin_transitions(board.GP18, 'BUTTON_3', input_device.button_pressed, input_device.button_released))
+    interrupt_task2 = asyncio.create_task(catch_pin_transitions(board.GP19, 'BUTTON_4', input_device.button_pressed, input_device.button_released))
+    interrupt_task3 = asyncio.create_task(catch_pin_transitions(board.GP20, 'BUTTON_2', input_device.button_pressed, input_device.button_released))
+    interrupt_task4 = asyncio.create_task(catch_pin_transitions(board.GP21, 'BUTTON_1', input_device.button_pressed, input_device.button_released))
+    interrupt_led   = asyncio.create_task(led_flush())
+    await asyncio.gather(interrupt_task1, interrupt_task2, interrupt_task3, interrupt_task4, interrupt_led)
+
 ######### MAIN ##########
 if __name__=='__main__':
     # Setup
@@ -1082,20 +1116,22 @@ if __name__=='__main__':
     application = None
     setup()
 
-    while True:
-        try:
-            # USB MIDI Device task
-            application.do_task()
+    asyncio.run(main())
 
-        except Exception as e:
-            print('CATCH EXCEPTION:', e)
+#    while True:
+#        try:
+#            # USB MIDI Device task
+#            application.do_task()
+#
+#        except Exception as e:
+#            print('CATCH EXCEPTION:', e)
 #            application.show_midi_channel(False, True)
 #            application.show_message('ERROR: ' + str(e))
-            for cnt in list(range(10)):
-                pico_led.value = False
-                sleep(0.5)
-                pico_led.value = True
-                sleep(1.0)
+#            for cnt in list(range(10)):
+#                pico_led.value = False
+#                sleep(0.5)
+#                pico_led.value = True
+#                sleep(1.0)
 
 #            display.clear()
 #            application.show_midi_channel(True, True)
