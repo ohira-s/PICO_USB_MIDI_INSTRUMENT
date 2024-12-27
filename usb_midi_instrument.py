@@ -758,6 +758,44 @@ class Guitar_class:
 
         self._display.show()
 
+    # Play a string
+    def play_a_string(self, string, string_velosity):
+        print('PLAY a STRING:', string_velosity)
+        # Notes off (previous chord)
+        if self._chord_changed:
+            if self._notes_off is not None:
+                if chord_note in self._notes_off:
+                    synth.set_note_off(chord_note, 0)
+                    self._notes_off.remove(chord_note)
+                    if len(self._notes_off) == 0:
+                        self._notes_off = None
+                        
+                    sleep(0.001)
+
+            self._chord_changed = False
+
+        # Play strings in the current chord
+        string_notes = self.chord_notes()
+        chord_note = string_notes[string]
+        if chord_note >= 0:
+            # Note off
+            if self._notes_off is not None:
+                if chord_note in self._notes_off:
+                    synth.set_note_off(chord_note, 0)
+                    self._notes_off.remove(chord_note)
+                    if len(self._notes_off) == 0:
+                        self._notes_off = None
+                        
+                    sleep(0.001)
+
+            # Note on
+            if string_velosity > 0:
+                synth.set_note_on(chord_note, string_velosity, 0)
+                if self._notes_off is None:
+                    self._notes_off = []
+                self._notes_off.append(chord_note)
+                sleep(0.001)
+
     # Play strings
     #   string_velosities: [-1,0,127,63,85,-1] ---> String 6=Ignore, 5=Note off, 4=Note on in velosity 127,...
     def play_strings(self, string_velosities):
@@ -1235,8 +1273,8 @@ class ADC_Device_class:
 
         self._adc_name = adc_name
         self._voltage = 0.0
-        self._note_on = [False] * 6
-        self._note_on_ticks = 0
+        self._note_on = [False] * 6				# 6 strings on guitar
+        self._note_on_ticks = [-1] * 8			# 8 pads on UI (Piezo elements)
         self._play_chord = False
         self._voltage_gate = [100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
 
@@ -1280,21 +1318,17 @@ class ADC_Device_class:
 
         ###--- Main: adc_handler ---###
         current_ticks = supervisor.ticks_ms()
-        from_note_on = ticks_diff(current_ticks, self._note_on_ticks)
-#        if self._note_on:
-#            if from_note_on >= 1500:
-#                print('AUTO NOTES OFF')
-#                instrument_guitar.play_chord(False)
-#                self._note_on = False
-                
-#                display.fill_rect(0, 55, 128, 9, 0)
-#                display.text(self.adc_name() + ': AUTO OFF=' + str(ticks_diff(current_ticks, self._note_on_ticks)), 0, 55, 1)
-#                display.show()
+        from_note_on = [-1] * 8
+        for string in list(range(8)):
+            if self._note_on_ticks[string] >= 0:
+                from_note_on[string] = ticks_diff(current_ticks, self._note_on_ticks[string])
+
+        print('TICK: ' + str(from_note_on))
+#        display.fill_rect(0, 46, 128, 9, 0)
+#        display.text('TICK:' + str(from_note_on), 0, 46, 1)
+#        display.show()
 
         # Get voltages guitar strings
-        play_guitar_flag = False
-        play_chord_flag = False
-        strings_play = [-1] * 6
         for string in list(range(8)):
             voltage = self.get_voltage(string)
 #            print('STR ' + str(string) + ' / VOL=', voltage)
@@ -1302,21 +1336,26 @@ class ADC_Device_class:
             
 #            if string >= 6:
 #                print('STRING ' + str(string) + ': ' + str(voltage))
-                
+
+            # Note on time out
+            if from_note_on[string] >= 1500:
+                if string <= 5:
+                    if self._note_on[string]:
+                        self._note_on[string] = False
+                        self._note_on_ticks[string] = -1
+                        instrument_guitar.play_a_string(string, 0)
+                    
+                elif string == 7:
+                    if self._play_chord:
+                        instrument_guitar.play_chord(False)
+                        self._play_chord = False
+                        self._note_on_ticks[string] = -1
+#                        display.fill_rect(0, 55, 128, 9, 0)
+#                        display.text('CHORD OFF by TIMEOUT', 0, 55, 1)
+#                        display.show()
+
+            # Pad is tapped
             if velosity >= self._voltage_gate[string]:
-                # Note on time out
-                if from_note_on >= 250:
-                    if string <= 5:
-                        if self._note_on[string]:
-                            self._note_on[string] = False
-                        
-                    elif string == 7:
-                        if self._play_chord:
-                            instrument_guitar.play_chord(False)
-                            self._play_chord = False
-                            display.fill_rect(0, 55, 128, 9, 0)
-                            display.text('CHORD OFF by TIMEOUT', 0, 55, 1)
-                            display.show()
                             
                 # Velosity
                 velosity = int(velosity / 3.5)
@@ -1328,9 +1367,16 @@ class ADC_Device_class:
                 # Note on
                 if string <= 5:
                     # Play a string
-                    if not self._note_on[string]:
-                        strings_play[5 - string] = velosity
-                        play_guitar_flag = True
+                    if self._note_on[string]:
+                        print('PLAY a STRING OFF:', string)
+                        self._note_on[string] = False
+                        self._note_on_ticks[string] = -1
+                        instrument_guitar.play_a_string(string, 0)
+
+                    print('PLAY a STRING:', string)
+                    self._note_on[string] = True
+                    self._note_on_ticks[string] = current_ticks
+                    instrument_guitar.play_a_string(string, velosity)
                     
                 # Play chord
                 elif string == 7:
@@ -1338,49 +1384,18 @@ class ADC_Device_class:
                         print('PLAY CHORD OFF')
                         instrument_guitar.play_chord(False)
                         self._play_chord = False
-                        display.fill_rect(0, 55, 128, 9, 0)
-                        display.text('CHORD OFF to CHANGE', 0, 55, 1)
-                        display.show()
+                        self._note_on_ticks[string] = -1
+#                        display.fill_rect(0, 55, 128, 9, 0)
+#                        display.text('CHORD OFF to CHANGE', 0, 55, 1)
+#                        display.show()
                         
                     print('PLAY CHORD')
                     instrument_guitar.play_chord(True, velosity)
                     self._play_chord = True
-                    display.fill_rect(0, 55, 128, 9, 0)
-                    display.text('CHORD ON ' + str(velosity), 0, 55, 1)
-                    display.show()
-                    
-##                    print(self.adc_name() + ' TICKS: ', self._note_on_ticks, '=======================')
-##                    print('STRING ' + str(string) + ':' + str(int(voltage * 1000)) + 'mV / VS:' + str(velosity) + ' / ' + str(strings_play))
-
-            elif velosity <= 150.0:
-                # Ignore chattering
-                if from_note_on >= 800:
-                    # Play a string
-                    if string <= 5:
-                        if self._note_on[string]:
-                            strings_play[5 - string] = 0
-                            self._note_on[string] = False
-                            play_guitar_flag = True
-                            
-                    elif string == 7:
-                        if self._play_chord:
-                            print('PLAY CHORD OFF')
-                            instrument_guitar.play_chord(False)
-                            self._play_chord = False
-                            display.fill_rect(0, 55, 128, 9, 0)
-                            display.text('CHORD OFF by LOW VOLTAGE', 0, 55, 1)
-                            display.show()
-                            
-
-#                        display.fill_rect(0, 55, 128, 9, 0)
-#                        display.text(self.adc_name() + ':' + str(int(voltage * 1000)) + 'mV / NOTES OFF', 0, 55, 1)
-#                        display.show()
-##                        print('STRING ' + str(string) + ':' + ':' + str(int(voltage * 1000)) + 'mV / NOTES OFF')
-##                        print('STRING ' + str(string) + ':' + ' TICKS DIFF:' + str(ticks_diff(supervisor.ticks_ms(), self._note_on_ticks)))
-
-        # Play each string
-        if play_guitar_flag:
-            instrument_guitar.play_strings(strings_play)
+                    self._note_on_ticks[string] = current_ticks
+#                    display.fill_rect(0, 55, 128, 9, 0)
+#                    display.text('CHORD ON ' + str(velosity), 0, 55, 1)
+#                    display.show()
 
 
 async def main():
