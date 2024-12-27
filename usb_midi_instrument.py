@@ -796,6 +796,8 @@ class Guitar_class:
                 self._notes_off.append(chord_note)
                 sleep(0.001)
 
+        return chord_note
+
     # Play strings
     #   string_velosities: [-1,0,127,63,85,-1] ---> String 6=Ignore, 5=Note off, 4=Note on in velosity 127,...
     def play_strings(self, string_velosities):
@@ -1272,11 +1274,12 @@ class ADC_Device_class:
         self._4051_selectors[2].direction = digitalio.Direction.OUTPUT
 
         self._adc_name = adc_name
-        self._voltage = 0.0
         self._note_on = [False] * 6				# 6 strings on guitar
         self._note_on_ticks = [-1] * 8			# 8 pads on UI (Piezo elements)
         self._play_chord = False
         self._voltage_gate = [100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+
+        self._mute_string = False
 
     def adc(self):
         return self._adc
@@ -1343,7 +1346,7 @@ class ADC_Device_class:
                     if self._note_on[string]:
                         self._note_on[string] = False
                         self._note_on_ticks[string] = -1
-                        instrument_guitar.play_a_string(string, 0)
+                        instrument_guitar.play_a_string(5 - string, 0)
                     
                 elif string == 7:
                     if self._play_chord:
@@ -1368,15 +1371,25 @@ class ADC_Device_class:
                 if string <= 5:
                     # Play a string
                     if self._note_on[string]:
-                        print('PLAY a STRING OFF:', string)
+                        print('PLAY a STRING OFF:', 5 - string)
                         self._note_on[string] = False
                         self._note_on_ticks[string] = -1
-                        instrument_guitar.play_a_string(string, 0)
+                        instrument_guitar.play_a_string(5 - string, 0)
 
-                    print('PLAY a STRING:', string)
+                    print('PLAY a STRING:', 5 - string)
                     self._note_on[string] = True
                     self._note_on_ticks[string] = current_ticks
-                    instrument_guitar.play_a_string(string, velosity)
+                    chord_note = instrument_guitar.play_a_string(5 - string, velosity)
+
+                    if chord_note < 0:
+                        self._mute_string = True
+                        display.fill_rect(0, 55, 128, 9, 0)
+                        display.text('Mute String: ' + str(5 - string), 0, 55, 1)
+                        display.show()
+                    elif self._mute_string:
+                        self._mute_string = False
+                        display.fill_rect(0, 55, 128, 9, 0)
+                        display.show()
                     
                 # Play chord
                 elif string == 7:
@@ -1393,6 +1406,11 @@ class ADC_Device_class:
                     instrument_guitar.play_chord(True, velosity)
                     self._play_chord = True
                     self._note_on_ticks[string] = current_ticks
+
+                    if self._mute_string:
+                        self._mute_string = False
+                        display.fill_rect(0, 55, 128, 9, 0)
+                        display.show()
 #                    display.fill_rect(0, 55, 128, 9, 0)
 #                    display.text('CHORD ON ' + str(velosity), 0, 55, 1)
 #                    display.show()
