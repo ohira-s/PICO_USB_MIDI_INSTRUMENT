@@ -20,6 +20,9 @@
 #            ADC test.
 #     0.2.1: 12/27/2024
 #            Piezo elements for guitar UI.
+#     0.2.2: 01/06/2025
+#            Guitar low and high chords.
+#            Instrument change.
 #########################################################################
 
 import asyncio
@@ -273,6 +276,8 @@ class USB_MIDI_Instrument_class:
         self.ControlChange_Chorus_Feedback = 59		# 0..127
         self.ControlChange_Chorus_Delay    = 60		# 0..127
 
+        self._note_key = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+
         # USB MIDI device
         print('USB MIDI:', usb_midi.ports)
         self._usb_midi = [None] * 16
@@ -281,6 +286,9 @@ class USB_MIDI_Instrument_class:
 
     # Get instrument name
     def get_instrument_name(self, program, gmbank=0):
+        if program < 0:
+            return '---'
+
         try:
 #            # SD card file system
 #            f = sdcard.file_open('/SD/SYNTH/MIDIFILE/', 'GM0.TXT', 'r')
@@ -299,7 +307,7 @@ class USB_MIDI_Instrument_class:
                 for instrument in f:
                     prg = prg + 1
                     if prg == program:
-                        return instrument
+                        return instrument.strip()
 
         except Exception as e:
             application.show_message('GM LIST:' + e)
@@ -334,7 +342,7 @@ class USB_MIDI_Instrument_class:
                 for instrument in f:
                     prg = prg + 1
                     if prg == program:
-                        return instrument
+                        return instrument.strip()
 
         except Exception as e:
             application.show_message('DRUMSET LIST:' + e)
@@ -349,12 +357,30 @@ class USB_MIDI_Instrument_class:
 
         return '???'
 
+    # Get note name
+    def get_note_name(self, note):
+        name = self._note_key[note % 12]
+        octave = int(note / 12) - 1
+        if octave >= 0:
+            name = name + str(octave)
+        
+        return name
+
     # MIDI sends to USB as a USB device
     def midi_send(self, midi_msg, channel=0):
 #        print('SEND:', channel, midi_msg)
         self._usb_midi[channel % 16].send(midi_msg)
 #        print('SENT')
 
+        if application._DEBUG_MODE:
+            if isinstance(midi_msg, NoteOn):
+                if midi_msg.velocity == 0:
+                    application.show_message('off:' + str(midi_msg.note) + '/' + str(midi_msg.velocity), 0, 55, 1)
+                else:
+                    application.show_message('ON :' + str(midi_msg.note) + '/' + str(midi_msg.velocity), 0, 55, 1)
+            elif isinstance(midi_msg, NoteOff):
+                application.show_message('OFF:' + str(midi_msg.note), 0, 55, 1)
+            
     # MIDI-OUT for keeping compatobolity to UART version
     def midi_out(self, midi_msg, channel=0):
         self.midi_send(midi_msg, channel)
@@ -366,6 +392,7 @@ class USB_MIDI_Instrument_class:
     # Send note off
     def set_note_off(self, note_key, channel=0):
         self.midi_send(NoteOff(note_key, channel=channel), channel)
+#        self.midi_send(NoteOn(note_key, 0, channel=channel), channel)
 
     # Send all notes off
     def set_all_notes_off(self, channel=0):
@@ -403,7 +430,8 @@ class USB_MIDI_Instrument_class:
 
     # Send program change
     def set_program_change(self, program, channel=0):
-        self.midi_send(ProgramChange(program, channel=channel), channel)
+        if program >= 0 and program <= 127:
+            self.midi_send(ProgramChange(program, channel=channel), channel)
 
     def set_pitch_bend_range(self, channel, value):
         status_byte = 0xB0 + channel
@@ -484,186 +512,186 @@ class Guitar_class:
         self.PARAM_GUITAR_CHORDs = ['M', 'M7', '7', '6', 'aug', 'm', 'mM7', 'm7', 'm6', 'm7-5', 'add9', 'sus4', '7sus4', 'dim7']
         self.GUITAR_STRINGS_OPEN = [16,11, 7, 2, -3, -8]	# 1st String: E, B, G, D, A, E: 6th String
         self.CHORD_STRUCTURE = {
-            #Chord   :   1  2  3  4  5  6		  Strings
-            'CM'     : [ 0, 1, 0, 2, 3,-1],		# Fret number
-            'CM7'    : [ 0, 0, 0, 2, 3,-1],
-            'C7'     : [ 0, 1, 3, 2, 3,-1],
-            'C6'     : [ 0, 1, 2, 2, 3,-1],
-            'Caug'   : [-1, 1, 1, 2, 3,-1],
-            'Cm'     : [ 3, 4, 5, 5, 3,-1],
-            'CmM7'   : [ 3, 4, 4, 5, 3,-1],
-            'Cm7'    : [ 3, 4, 3, 5, 3,-1],
-            'Cm6'    : [ 3, 1, 2, 1, 3,-1],
-            'Cm7-5'  : [-1, 4, 3, 4, 3,-1],
-            'Cadd9'  : [ 0, 3, 0, 2, 3,-1],
-            'Csus4'  : [ 1, 1, 0, 3, 3,-1],
-            'C7sus4' : [ 3, 6, 3, 5, 3,-1],
-            'Cdim7'  : [-1, 4, 2, 4, 3,-1],
+            #Chord   : LO:1  2  3  4  5  6  HI:1  2  3  4  5  6			# Strings
+            'CM'     : ([ 0, 1, 0, 2, 3,-1], [ 3, 5, 5, 5, 3,-1]),		# Fret number to press (-1 is not to play it)
+            'CM7'    : ([ 0, 0, 0, 2, 3,-1], [ 3, 5, 4, 5, 3,-1]),
+            'C7'     : ([ 0, 1, 3, 2, 3,-1], [ 3, 5, 3, 5, 3,-1]),
+            'C6'     : ([ 0, 1, 2, 2, 3,-1], [ 5, 5, 5, 5, 3,-1]),
+            'Caug'   : ([-1, 1, 1, 2, 3,-1], [ 8, 9, 9,10,-1,-1]),
+            'Cm'     : ([ 3, 4, 5, 5, 3,-1], [ 8, 8, 8,10,10, 8]),
+            'CmM7'   : ([ 3, 4, 4, 5, 3,-1], [ 8, 8, 8, 9,10, 8]),
+            'Cm7'    : ([ 3, 4, 3, 5, 3,-1], [ 8, 8, 8, 8,10, 8]),
+            'Cm6'    : ([ 3, 1, 2, 1, 3,-1], [ 8,10, 8,10,10, 8]),
+            'Cm7-5'  : ([-1, 4, 3, 4, 3,-1], [12,12,12,10,-1,-1]),
+            'Cadd9'  : ([ 0, 3, 0, 2, 3,-1], [ 3, 3, 5, 5, 3,-1]),
+            'Csus4'  : ([ 1, 1, 0, 3, 3,-1], [ 8, 8,10,10,10, 8]),
+            'C7sus4' : ([ 3, 6, 3, 5, 3,-1], [ 8, 8,10, 8,10, 8]),
+            'Cdim7'  : ([-1, 4, 2, 4, 3,-1], [11,10,11,10,-1,-1]),
 
-            'C#M'    : [ 4, 6, 6, 6, 4,-1],
-            'C#M7'   : [ 4, 6, 5, 6, 4,-1],
-            'C#7'    : [ 4, 6, 4, 6, 4,-1],
-            'C#6'    : [ 6, 6, 6, 6, 4,-1],
-            'C#aug'  : [-1, 2, 2, 3, 4,-1],
-            'C#m'    : [ 4, 5, 6, 6, 4,-1],
-            'C#mM7'  : [ 4, 5, 5, 6, 4,-1],
-            'C#m7'   : [ 4, 5, 4, 6, 4,-1],
-            'C#m6'   : [ 4, 2, 3, 2, 4,-1],
-            'C#m7-5' : [-1, 5, 4, 5, 4,-1],
-            'C#add9' : [ 4, 4, 6, 6, 4,-1],
-            'C#sus4' : [ 4, 7, 6, 6, 4,-1],
-            'C#7sus4': [ 4, 7, 4, 6, 4,-1],
-            'C#dim7' : [-1, 5, 3, 5, 4,-1],
+            'C#M'    : ([ 4, 6, 6, 6, 4,-1], [ 9, 9,10,11,11, 9]),
+            'C#M7'   : ([ 4, 6, 5, 6, 4,-1], [ 9,10,11,12,-1,-1]),
+            'C#7'    : ([ 4, 6, 4, 6, 4,-1], [ 9, 9,10, 9,11, 9]),
+            'C#6'    : ([ 6, 6, 6, 6, 4,-1], [ 9,11,10,11,-1,-1]),
+            'C#aug'  : ([-1, 2, 2, 3, 4,-1], [ 9,10,10,11,-1,-1]),
+            'C#m'    : ([ 4, 5, 6, 6, 4,-1], [ 9, 9, 9,11,11, 9]),
+            'C#mM7'  : ([ 4, 5, 5, 6, 4,-1], [ 9, 9, 9,10,11, 9]),
+            'C#m7'   : ([ 4, 5, 4, 6, 4,-1], [12,12,12,10,-1,-1]),
+            'C#m6'   : ([ 4, 2, 3, 2, 4,-1], [ 9,11, 9,11,11, 9]),
+            'C#m7-5' : ([-1, 5, 4, 5, 4,-1], [12,12,12,10,-1,-1]),
+            'C#add9' : ([ 4, 4, 6, 6, 4,-1], [10, 8, 9,10,-1,-1]),
+            'C#sus4' : ([ 4, 7, 6, 6, 4,-1], [ 9, 9,11,11,11, 9]),
+            'C#7sus4': ([ 4, 7, 4, 6, 4,-1], [ 9, 9,11, 9,11, 9]),
+            'C#dim7' : ([-1, 5, 3, 5, 4,-1], [12,11,12,11,-1,-1]),
 
-            'DM'     : [ 2, 3, 2, 0,-1,-1],
-            'DM7'    : [ 2, 2, 2, 0,-1,-1],
-            'D7'     : [ 2, 1, 2, 0,-1,-1],
-            'D6'     : [ 2, 0, 2, 0,-1,-1],
-            'Daug'   : [ 2, 3, 3, 0,-1,-1],
-            'Dm'     : [ 1, 3, 2, 0,-1,-1],
-            'DmM7'   : [ 1, 2, 2, 0,-1,-1],
-            'Dm7'    : [ 1, 1, 2, 0,-1,-1],
-            'Dm6'    : [ 1, 0, 2, 0,-1,-1],
-            'Dm7-5'  : [ 1, 1, 1, 0,-1,-1],
-            'Dadd9'  : [ 0, 3, 2, 0,-1,-1],
-            'Dsus4'  : [ 3, 3, 2, 0,-1,-1],
-            'D7sus4' : [ 3, 1, 2, 0,-1,-1],
-            'Ddim7'  : [ 1, 0, 1, 0,-1,-1],
+            'DM'     : ([ 2, 3, 2, 0,-1,-1], [ 5, 7, 7, 7, 5,-1]),
+            'DM7'    : ([ 2, 2, 2, 0,-1,-1], [ 5, 7, 6, 7, 5,-1]),
+            'D7'     : ([ 2, 1, 2, 0,-1,-1], [ 5, 7, 5, 7, 5,-1]),
+            'D6'     : ([ 2, 0, 2, 0,-1,-1], [ 7, 7, 7, 7, 5,-1]),
+            'Daug'   : ([ 2, 3, 3, 0,-1,-1], [11,12,12,13,-1,-1]),
+            'Dm'     : ([ 1, 3, 2, 0,-1,-1], [ 5, 6, 7, 7, 5,-1]),
+            'DmM7'   : ([ 1, 2, 2, 0,-1,-1], [ 5, 6, 6, 7, 5,-1]),
+            'Dm7'    : ([ 1, 1, 2, 0,-1,-1], [ 5, 6, 5, 7, 5,-1]),
+            'Dm6'    : ([ 1, 0, 2, 0,-1,-1], [-1,10,10, 9,-1,10]),
+            'Dm7-5'  : ([ 1, 1, 1, 0,-1,-1], [-1, 6, 5, 6, 5,-1]),
+            'Dadd9'  : ([ 0, 3, 2, 0,-1,-1], [ 5, 5, 7, 7, 5,-1]),
+            'Dsus4'  : ([ 3, 3, 2, 0,-1,-1], [ 5, 8, 7, 7, 5,-1]),
+            'D7sus4' : ([ 3, 1, 2, 0,-1,-1], [ 5, 8, 5, 7, 5,-1]),
+            'Ddim7'  : ([ 1, 0, 1, 0,-1,-1], [-1, 9,10, 9,-1,10]),
 
-            'D#M'    : [ 6, 8, 8, 8, 6,-1],
-            'D#M7'   : [ 6, 8, 7, 8, 6,-1],
-            'D#7'    : [ 6, 8, 6, 8, 6,-1],
-            'D#6'    : [ 8, 8, 8, 8, 6,-1],
-            'D#aug'  : [-1, 4, 4, 5, 6,-1],
-            'D#m'    : [ 6, 7, 8, 8, 6,-1],
-            'D#mM7'  : [ 6, 7, 7, 8, 6,-1],
-            'D#m7'   : [ 6, 7, 6, 8, 6,-1],
-            'D#m6'   : [ 6, 4, 5, 4, 6,-1],
-            'D#m7-5' : [-1, 7, 6, 7, 6,-1],
-            'D#add9' : [ 6, 6, 8, 8, 6,-1],
-            'D#sus4' : [ 6, 9, 8, 8, 6,-1],
-            'D#7sus4': [ 6, 9, 6, 8, 6,-1],
-            'D#dim7' : [-1, 7, 5, 7, 6,-1],
+            'D#M'    : ([ 6, 8, 8, 8, 6,-1], [ 6, 8, 8, 8, 6,-1]),
+            'D#M7'   : ([ 6, 8, 7, 8, 6,-1], [ 6, 8, 7, 8, 6,-1]),
+            'D#7'    : ([ 6, 8, 6, 8, 6,-1], [ 6, 8, 6, 8, 6,-1]),
+            'D#6'    : ([ 8, 8, 8, 8, 6,-1], [ 8, 8, 8, 8, 6,-1]),
+            'D#aug'  : ([-1, 4, 4, 5, 6,-1], [ 6, 7, 7, 8,-1,-1]),
+            'D#m'    : ([ 6, 7, 8, 8, 6,-1], [ 6, 7, 8, 8, 6,-1]),
+            'D#mM7'  : ([ 6, 7, 7, 8, 6,-1], [ 6, 7, 7, 8, 6,-1]),
+            'D#m7'   : ([ 6, 7, 6, 8, 6,-1], [ 6, 7, 6, 8, 6,-1]),
+            'D#m6'   : ([ 6, 4, 5, 4, 6,-1], [-1,10,10, 9,-1,10]),
+            'D#m7-5' : ([-1, 7, 6, 7, 6,-1], [-1, 7, 6, 7, 6,-1]),
+            'D#add9' : ([ 6, 6, 8, 8, 6,-1], [ 6, 6, 8, 8, 6,-1]),
+            'D#sus4' : ([ 6, 9, 8, 8, 6,-1], [ 6, 9, 8, 8, 6,-1]),
+            'D#7sus4': ([ 6, 9, 6, 8, 6,-1], [ 6, 9, 6, 8, 6,-1]),
+            'D#dim7' : ([-1, 7, 5, 7, 6,-1], [10, 9,10, 9,-1,-1]),
 
-            'EM'     : [ 0, 0, 1, 2, 2, 0],
-            'EM7'    : [ 0, 0, 1, 1, 2, 0],
-            'E7'     : [ 0, 0, 1, 0, 2, 0],
-            'E6'     : [ 0, 2, 1, 2, 2, 0],
-            'Eaug'   : [ 0, 2, 2, 3,-1,-1],
-            'Em'     : [ 0, 0, 0, 2, 2, 0],
-            'EmM7'   : [-1, 0, 0, 1, 2, 0],
-            'Em7'    : [ 0, 0, 0, 0, 2, 0],
-            'Em6'    : [ 0, 2, 0, 2, 2, 0],
-            'Em7-5'  : [ 0, 3, 0, 2, 1, 0],
-            'Eadd9'  : [ 0, 0, 1, 4, 2, 0],
-            'Esus4'  : [ 0, 0, 2, 2, 2, 0],
-            'E7sus4' : [ 0, 0, 2, 0, 2, 0],
-            'Edim7'  : [ 0, 2, 0, 2, 1, 0],
+            'EM'     : ([ 0, 0, 1, 2, 2, 0], [ 7, 9, 9, 9, 7,-1]),
+            'EM7'    : ([ 0, 0, 1, 1, 2, 0], [ 7, 9, 8, 9, 7,-1]),
+            'E7'     : ([ 0, 0, 1, 0, 2, 0], [ 7, 9, 7, 9, 7,-1]),
+            'E6'     : ([ 0, 2, 1, 2, 2, 0], [ 9, 9, 9, 9, 7,-1]),
+            'Eaug'   : ([ 0, 2, 2, 3,-1,-1], [-1, 5, 5, 6, 7,-1]),
+            'Em'     : ([ 0, 0, 0, 2, 2, 0], [ 7, 8, 7, 9, 7,-1]),
+            'EmM7'   : ([-1, 0, 0, 1, 2, 0], [ 7, 8, 8, 9, 7,-1]),
+            'Em7'    : ([ 0, 0, 0, 0, 2, 0], [ 7, 8, 7, 9, 7,-1]),
+            'Em6'    : ([ 0, 2, 0, 2, 2, 0], [-1,12,12,11,-1,12]),
+            'Em7-5'  : ([ 0, 3, 0, 2, 1, 0], [-1, 8, 7, 8, 7,-1]),
+            'Eadd9'  : ([ 0, 0, 1, 4, 2, 0], [ 7, 7, 9, 9, 7,-1]),
+            'Esus4'  : ([ 0, 0, 2, 2, 2, 0], [ 7,10, 9, 9, 7,-1]),
+            'E7sus4' : ([ 0, 0, 2, 0, 2, 0], [ 7,10, 7, 9, 7,-1]),
+            'Edim7'  : ([ 0, 2, 0, 2, 1, 0], [-1,11,12,11,-1,12]),
 
-            'FM'     : [ 1, 1, 2, 3, 3, 1],
-            'FM7'    : [-1, 1, 2, 2,-1, 1],
-            'F7'     : [ 1, 1, 2, 1, 3, 1],
-            'F6'     : [ 1, 3, 2, 3, 1, 1],
-            'Faug'   : [ 1, 2, 2, 3,-1.-1],
-            'Fm'     : [ 1, 1, 1, 3, 3, 1],
-            'FmM7'   : [ 1, 1, 1, 2, 3, 1],
-            'Fm7'    : [ 1, 1, 1, 1, 3, 1],
-            'Fm6'    : [ 1, 3, 1, 3, 3, 1],
-            'Fm7-5'  : [-1, 0, 1, 1,-1, 1],
-            'Fadd9'  : [ 3, 1, 2, 3,-1,-1],
-            'Fsus4'  : [ 1, 1, 3, 3, 3, 1],
-            'F7sus4' : [ 1, 1, 3, 1, 3, 1],
-            'Fdim7'  : [ 1, 0, 1, 0,-1, 1],
+            'FM'     : ([ 1, 1, 2, 3, 3, 1], [ 8,10,10,10, 8,-1]),
+            'FM7'    : ([-1, 1, 2, 2,-1, 1], [ 8,10, 9,10, 8,-1]),
+            'F7'     : ([ 1, 1, 2, 1, 3, 1], [ 8,10, 8,10, 8,-1]),
+            'F6'     : ([ 1, 3, 2, 3, 1, 1], [10,10,10,10, 8,-1]),
+            'Faug'   : ([ 1, 2, 2, 3,-1.-1], [-1, 6, 6, 7, 8,-1]),
+            'Fm'     : ([ 1, 1, 1, 3, 3, 1], [ 8, 9,10,10, 8,-1]),
+            'FmM7'   : ([ 1, 1, 1, 2, 3, 1], [ 8, 9, 9,10, 8,-1]),
+            'Fm7'    : ([ 1, 1, 1, 1, 3, 1], [ 8, 9, 8,10, 8,-1]),
+            'Fm6'    : ([ 1, 3, 1, 3, 3, 1], [12,11,13,11,-1,-1]),
+            'Fm7-5'  : ([-1, 0, 1, 1,-1, 1], [-1, 9, 8, 9, 8,-1]),
+            'Fadd9'  : ([ 3, 1, 2, 3,-1,-1], [ 8, 8,10,10, 8,-1]),
+            'Fsus4'  : ([ 1, 1, 3, 3, 3, 1], [ 8,11,10,10, 8,-1]),
+            'F7sus4' : ([ 1, 1, 3, 1, 3, 1], [ 8,11, 8,10, 8,-1]),
+            'Fdim7'  : ([ 1, 0, 1, 0,-1, 1], [-1,12,13,12,-1,13]),
 
-            'F#M'    : [ 2, 2, 3, 4, 4, 2],
-            'F#M7'   : [-1, 2, 3, 3,-1, 2],
-            'F#7'    : [ 2, 2, 3, 2, 4, 2],
-            'F#6'    : [ 2, 4, 3, 4, 2, 2],
-            'F#aug'  : [ 2, 3, 3, 4,-1,-1],
-            'F#m'    : [ 2, 2, 2, 4, 4, 2],
-            'F#mM7'  : [ 2, 2, 2, 3, 4, 2],
-            'F#m7'   : [ 2, 2, 2, 2, 4, 2],
-            'F#m6'   : [ 2, 4, 2, 4, 4, 2],
-            'F#m7-5' : [ 0, 1, 2, 2,-1, 2],
-            'F#add9' : [ 4, 2, 3, 4,-1,-1],
-            'F#sus4' : [ 2, 2, 4, 4, 4, 2],
-            'F#7sus4': [ 2, 2, 4, 2, 4, 2],
-            'F#dim7' : [-1, 1, 2, 1,-1, 2],
+            'F#M'    : ([ 2, 2, 3, 4, 4, 2], [ 9,11,11,11, 9, 9]),
+            'F#M7'   : ([-1, 2, 3, 3,-1, 2], [ 9,11,10,11, 9, 9]),
+            'F#7'    : ([ 2, 2, 3, 2, 4, 2], [ 9,11, 9,11, 9, 9]),
+            'F#6'    : ([ 2, 4, 3, 4, 2, 2], [11,11,11,11, 9, 9]),
+            'F#aug'  : ([ 2, 3, 3, 4,-1,-1], [ 6, 7, 7, 8,-1,-1]),
+            'F#m'    : ([ 2, 2, 2, 4, 4, 2], [ 9,10,11,11, 9, 9]),
+            'F#mM7'  : ([ 2, 2, 2, 3, 4, 2], [ 9,10,10,11, 9, 9]),
+            'F#m7'   : ([ 2, 2, 2, 2, 4, 2], [ 9,10, 9,11, 9, 9]),
+            'F#m6'   : ([ 2, 4, 2, 4, 4, 2], [ 5, 4, 6, 4,-1,-1]),
+            'F#m7-5' : ([ 0, 1, 2, 2,-1, 2], [-1,10, 9,10, 9,-1]),
+            'F#add9' : ([ 4, 2, 3, 4,-1,-1], [-1, 7, 6, 6, 9,-1]),
+            'F#sus4' : ([ 2, 2, 4, 4, 4, 2], [ 9,12,11,11, 9, 9]),
+            'F#7sus4': ([ 2, 2, 4, 2, 4, 2], [ 9,12, 9,11, 9, 9]),
+            'F#dim7' : ([-1, 1, 2, 1,-1, 2], [ 5, 4, 5, 4,-1,-1]),
 
-            'GM'     : [ 3, 0, 0, 0, 2, 3],
-            'GM7'    : [ 2, 0, 0, 0, 2, 3],
-            'G7'     : [ 1, 0, 0, 0, 2, 3],
-            'G6'     : [ 0, 0, 0, 0, 2, 3],
-            'Gaug'   : [ 3, 4, 4, 5,-1,-1],
-            'Gm'     : [ 3, 3, 3, 5, 5, 3],
-            'GmM7'   : [ 3, 3, 3, 4, 5, 3],
-            'Gm7'    : [ 3, 3, 3, 3, 5, 3],
-            'Gm6'    : [ 3, 5, 3, 5, 5, 3],
-            'Gm7-5'  : [-1, 2, 3, 3,-1, 3],
-            'Gadd9'  : [ 3, 0, 2, 0, 0, 3],
-            'Gsus4'  : [ 3, 1, 0, 0, 3, 3],
-            'G7sus4' : [ 3, 3, 5, 3, 5, 3],
-            'Gdim7'  : [-1, 2, 3, 2,-1, 3],
+            'GM'     : ([ 3, 0, 0, 0, 2, 3], [ 3, 3, 4, 5, 5, 3]),
+            'GM7'    : ([ 2, 0, 0, 0, 2, 3], [ 7, 7, 7, 5,-1,-1]),
+            'G7'     : ([ 1, 0, 0, 0, 2, 3], [ 3, 3, 4, 3, 5, 3]),
+            'G6'     : ([ 0, 0, 0, 0, 2, 3], [12,12,12,12,10,-1]),
+            'Gaug'   : ([ 3, 4, 4, 5,-1,-1], [-1, 8, 8, 9,10,-1]),
+            'Gm'     : ([ 3, 3, 3, 5, 5, 3], [10,11,12,12,10,-1]),
+            'GmM7'   : ([ 3, 3, 3, 4, 5, 3], [10,11,11,12,10,-1]),
+            'Gm7'    : ([ 3, 3, 3, 3, 5, 3], [10,11,10,12,10,-1]),
+            'Gm6'    : ([ 3, 5, 3, 5, 5, 3], [ 6, 5, 7, 5,-1,-1]),
+            'Gm7-5'  : ([-1, 2, 3, 3,-1, 3], [ 7, 7, 7, 5,-1,-1]),
+            'Gadd9'  : ([ 3, 0, 2, 0, 0, 3], [10,10,12,12,10,-1]),
+            'Gsus4'  : ([ 3, 1, 0, 0, 3, 3], [ 3, 3, 5, 5, 5, 3]),
+            'G7sus4' : ([ 3, 3, 5, 3, 5, 3], [ 3, 3, 5, 3, 5, 3]),
+            'Gdim7'  : ([-1, 2, 3, 2,-1, 3], [ 6, 5, 6, 5,-1,-1]),
 
-            'G#M'    : [ 4, 4, 5, 6, 6, 4],
-            'G#M7'   : [-1, 4, 5, 5,-1, 4],
-            'G#7'    : [ 4, 4, 5, 4, 6, 4],
-            'G#6'    : [-1, 4, 5, 3,-1, 4],
-            'G#aug'  : [ 4, 5, 5, 6,-1,-1],
-            'G#m'    : [ 4, 4, 4, 6, 6, 4],
-            'G#mM7'  : [ 4, 4, 4, 5, 6, 4],
-            'G#m7'   : [ 4, 4, 4, 4, 6, 4],
-            'G#m6'   : [ 4, 6, 4, 6, 6, 4],
-            'G#m7-5' : [ 0, 3, 4, 4,-1, 4],
-            'G#add9' : [ 6, 4, 5, 6,-1,-1],
-            'G#sus4' : [ 4, 4, 6, 6, 6, 4],
-            'G#7sus4': [ 4, 4, 6, 4, 6, 4],
-            'G#dim7' : [-1, 3, 4, 3,-1, 4],
+            'G#M'    : ([ 4, 4, 5, 6, 6, 4], [11,13,13,13,11,-1]),
+            'G#M7'   : ([-1, 4, 5, 5,-1, 4], [11,13,12,13,11,-1]),
+            'G#7'    : ([ 4, 4, 5, 4, 6, 4], [-1, 9,11,10,11,-1]),
+            'G#6'    : ([-1, 4, 5, 3,-1, 4], [-1, 9,10,10,11,-1]),
+            'G#aug'  : ([ 4, 5, 5, 6,-1,-1], [-1, 9, 9,10,11,-1]),
+            'G#m'    : ([ 4, 4, 4, 6, 6, 4], [11,12,13,13,11,-1]),
+            'G#mM7'  : ([ 4, 4, 4, 5, 6, 4], [11,12,12,13,11,-1]),
+            'G#m7'   : ([ 4, 4, 4, 4, 6, 4], [11,12,11,13,11,-1]),
+            'G#m6'   : ([ 4, 6, 4, 6, 6, 4], [ 7, 6, 8, 6,-1,-1]),
+            'G#m7-5' : ([ 0, 3, 4, 4,-1, 4], [ 7, 7, 7, 6,-1,-1]),
+            'G#add9' : ([ 6, 4, 5, 6,-1,-1], [11,11,13,13,11,-1]),
+            'G#sus4' : ([ 4, 4, 6, 6, 6, 4], [11,14,13,13,11,-1]),
+            'G#7sus4': ([ 4, 4, 6, 4, 6, 4], [11,14,11,13,11,-1]),
+            'G#dim7' : ([-1, 3, 4, 3,-1, 4], [ 7, 6, 7, 6,-1,-1]),
 
-            'AM'     : [ 0, 2, 2, 2, 0,-1],
-            'AM7'    : [ 0, 2, 1, 2, 0,-1],
-            'A7'     : [ 0, 2, 0, 2, 0,-1],
-            'A6'     : [ 2, 2, 2, 2, 0,-1],
-            'Aaug'   : [ 1, 2, 2, 3, 0,-1],
-            'Am'     : [ 0, 1, 2, 2, 0,-1],
-            'AmM7'   : [ 0, 1, 1, 2, 0,-1],
-            'Am7'    : [ 0, 1, 0, 2, 0,-1],
-            'Am6'    : [ 2, 1, 2, 2, 0,-1],
-            'Am7-5'  : [-1, 1, 0, 1, 0,-1],
-            'Aadd9'  : [ 0, 0, 2, 2, 0,-1],
-            'Asus4'  : [ 0, 3, 2, 2, 0,-1],
-            'A7sus4' : [ 0, 3, 0, 2, 0,-1],
-            'Adim7'  : [ 2, 1, 2, 1, 0,-1],
+            'AM'     : ([ 0, 2, 2, 2, 0,-1], [ 5, 5, 6, 7, 7, 5]),
+            'AM7'    : ([ 0, 2, 1, 2, 0,-1], [-1, 5, 6, 6,-1, 5]),
+            'A7'     : ([ 0, 2, 0, 2, 0,-1], [ 5, 5, 6, 5, 7, 5]),
+            'A6'     : ([ 2, 2, 2, 2, 0,-1], [-1,10,11,11,12,-1]),
+            'Aaug'   : ([ 1, 2, 2, 3, 0,-1], [ 5, 6, 6, 7,-1,-1]),
+            'Am'     : ([ 0, 1, 2, 2, 0,-1], [ 5, 5, 5, 7, 7, 5]),
+            'AmM7'   : ([ 0, 1, 1, 2, 0,-1], [ 5, 5, 5, 6, 7, 5]),
+            'Am7'    : ([ 0, 1, 0, 2, 0,-1], [ 5, 5, 5, 5, 7, 5]),
+            'Am6'    : ([ 2, 1, 2, 2, 0,-1], [-1, 6, 6, 5,-1, 6]),
+            'Am7-5'  : ([-1, 1, 0, 1, 0,-1], [ 9, 9, 9, 7,-1,-1]),
+            'Aadd9'  : ([ 0, 0, 2, 2, 0,-1], [ 7, 5, 6, 7,-1,-1]),
+            'Asus4'  : ([ 0, 3, 2, 2, 0,-1], [ 5, 5, 7, 7, 7, 5]),
+            'A7sus4' : ([ 0, 3, 0, 2, 0,-1], [ 5, 5, 7, 5, 7, 5]),
+            'Adim7'  : ([ 2, 1, 2, 1, 0,-1], [-1, 4, 5, 4,-1, 5]),
 
-            'A#M'    : [ 1, 3, 3, 3, 1,-1],
-            'A#M7'   : [ 1, 3, 2, 3, 1,-1],
-            'A#7'    : [ 1, 3, 1, 3, 1,-1],
-            'A#6'    : [ 3, 3, 3, 3, 1,-1],
-            'A#aug'  : [ 6, 7, 7, 8,-1,-1],
-            'A#m'    : [ 1, 2, 3, 3, 1,-1],
-            'A#mM7'  : [ 1, 2, 2, 3, 1,-1],
-            'A#m7'   : [ 1, 2, 1, 3, 1,-1],
-            'A#m6'   : [ 3, 2, 3, 1, 1,-1],
-            'A#m7-5' : [-1, 2, 1, 2, 1,-1],
-            'A#add9' : [ 1, 1, 3, 3, 1,-1],
-            'A#sus4' : [ 1, 4, 3, 3, 1,-1],
-            'A#7sus4': [ 1, 4, 1, 3, 1,-1],
-            'A#dim7' : [ 0, 2, 0, 2, 1,-1],
+            'A#M'    : ([ 1, 3, 3, 3, 1,-1], [ 6, 6, 7, 8, 8, 6]),
+            'A#M7'   : ([ 1, 3, 2, 3, 1,-1], [-1, 6, 7, 7,-1, 6]),
+            'A#7'    : ([ 1, 3, 1, 3, 1,-1], [ 6, 6, 7, 6, 8, 6]),
+            'A#6'    : ([ 3, 3, 3, 3, 1,-1], [-1,11,12,12,13,-1]),
+            'A#aug'  : ([ 6, 7, 7, 8,-1,-1], [ 6, 7, 7, 8,-1,-1]),
+            'A#m'    : ([ 1, 2, 3, 3, 1,-1], [ 6, 6, 6, 8, 8, 6]),
+            'A#mM7'  : ([ 1, 2, 2, 3, 1,-1], [ 6, 6, 6, 7, 8, 6]),
+            'A#m7'   : ([ 1, 2, 1, 3, 1,-1], [ 6, 6, 6, 6, 8, 6]),
+            'A#m6'   : ([ 3, 2, 3, 1, 1,-1], [-1, 7, 7, 6,-1, 7]),
+            'A#m7-5' : ([-1, 2, 1, 2, 1,-1], [10,10,10, 8,-1,-1]),
+            'A#add9' : ([ 1, 1, 3, 3, 1,-1], [ 8, 6, 7, 8,-1,-1]),
+            'A#sus4' : ([ 1, 4, 3, 3, 1,-1], [ 6, 6, 8, 8, 8, 6]),
+            'A#7sus4': ([ 1, 4, 1, 3, 1,-1], [ 6, 6, 8, 6, 8, 6]),
+            'A#dim7' : ([ 0, 2, 0, 2, 1,-1], [-1, 5, 6, 5,-1, 6]),
 
-            'BM'     : [ 2, 4, 4, 4, 2,-1],
-            'BM7'    : [ 2, 4, 3, 4, 2,-1],
-            'B7'     : [ 2, 0, 2, 1, 2,-1],
-            'B6'     : [ 4, 4, 4, 4, 2,-1],
-            'Baug'   : [-1, 0, 0, 1, 2,-1],
-            'Bm'     : [ 2, 3, 4, 4, 2,-1],
-            'BmM7'   : [ 2, 3, 3, 4, 2,-1],
-            'Bm7'    : [ 2, 3, 2, 4, 2,-1],
-            'Bm6'    : [ 3, 0, 2, 0, 3,-1],
-            'Bm7-5'  : [-1, 3, 2, 3, 2,-1],
-            'Badd9'  : [ 1, 1, 3, 3, 1,-1],
-            'Bsus4'  : [ 2, 5, 4, 4, 2,-1],
-            'B7sus4' : [ 2, 5, 2, 4, 2,-1],
-            'Bdim7'  : [-1, 3, 1, 3, 2,-1]
+            'BM'     : ([ 2, 4, 4, 4, 2,-1], [ 7, 7, 8, 9, 9, 7]),
+            'BM7'    : ([ 2, 4, 3, 4, 2,-1], [-1, 7, 8, 8,-1, 7]),
+            'B7'     : ([ 2, 0, 2, 1, 2,-1], [ 7, 7, 8, 7, 9, 7]),
+            'B6'     : ([ 4, 4, 4, 4, 2,-1], [ 7, 9, 8, 9,-1,-1]),
+            'Baug'   : ([-1, 0, 0, 1, 2,-1], [ 7, 8, 8, 9,-1,-1]),
+            'Bm'     : ([ 2, 3, 4, 4, 2,-1], [ 7, 7, 7, 9, 9, 7]),
+            'BmM7'   : ([ 2, 3, 3, 4, 2,-1], [ 7, 7, 7, 8, 9, 7]),
+            'Bm7'    : ([ 2, 3, 2, 4, 2,-1], [ 7, 7, 7, 7, 9, 7]),
+            'Bm6'    : ([ 3, 0, 2, 0, 3,-1], [10, 9,11, 9,-1,-1]),
+            'Bm7-5'  : ([-1, 3, 2, 3, 2,-1], [11,11,11, 9,-1,-1]),
+            'Badd9'  : ([ 1, 1, 3, 3, 1,-1], [ 9, 7, 8, 9,-1,-1]),
+            'Bsus4'  : ([ 2, 5, 4, 4, 2,-1], [ 7, 7, 9, 9, 9, 7]),
+            'B7sus4' : ([ 2, 5, 2, 4, 2,-1], [ 7, 7, 9, 7, 9, 7]),
+            'Bdim7'  : ([-1, 3, 1, 3, 2,-1], [-1, 6, 7, 6,-1, 7])
         }
 
         self.PARAM_ALL = -1
@@ -675,27 +703,49 @@ class Guitar_class:
         self.value_guitar_chord = 0		# Current chord
         self._chord_changed = False
         
-        self._program_number = 26  		# Steel Guitar
+        self._programs = [-1, 24, 25, 26, 27, 28, 29, 30, 31, 104, 105, 106, 107]
+        self._program_number = 0  		# Steel Guitar
         self._scale_number = 4
+        self._chord_position = 0		# 0: Low chord, 1: High chord
         self._notes_on  = None
         self._notes_off = None
 
         # Device aliases
         input_device.device_alias('GUITAR_ROOT_SELECTOR', 'BUTTON_1')
         input_device.device_alias('GUITAR_CHORD_SELECTOR', 'BUTTON_2')
-        input_device.device_alias('GUITAR_PLAY', 'BUTTON_3')
-        input_device.device_alias('GUITAR_EFFECTOR', 'BUTTON_4')
+        input_device.device_alias('GUITAR_CHORD_POSITION', 'BUTTON_3')
+        input_device.device_alias('GUITAR_INSTRUMENT', 'BUTTON_4')
+        input_device.device_alias('GUITAR_EFFECTOR', 'BUTTON_5')
 
     def setup(self):
         display.fill(0)
-        synth.set_program_change(self.program_number(), 0) 
+        synth.set_program_change(self.program_number()[1], 0) 
         self.show_settings(self.PARAM_ALL, 1)
 
     def program_number(self, prog=None):
         if prog is not None:
-            self._program_number = prog
+            self._program_number = prog % len(self._programs)
         
-        return self._program_number
+        return (self._program_number, self._programs[self._program_number])
+
+    def abbrev(self, instrument):
+        if instrument.find(' Guitar ') < 0:
+            return instrument
+        
+        if len(instrument) <= 14:
+            return instrument
+        
+        instrument = instrument.replace(' Guitar', ' GT')
+        chars = len(instrument)
+        if chars <= 14:
+            return instrument
+        
+        dels = chars - 14
+        guitar_pos = instrument.find(' GT')
+        if guitar_pos <= dels:
+            return instrument
+        
+        return instrument[0:guitar_pos][0:guitar_pos - dels] + instrument[guitar_pos:]
 
     def guitar_string_note(self, strings, frets):
         if frets < 0:
@@ -713,6 +763,13 @@ class Guitar_class:
             self._scale_number = scale
             
         return self._scale_number
+
+    def chord_position(self, pos=None):
+        if pos is not None:
+            pos = pos % 2                
+            self._chord_position = pos
+        
+        return self._chord_position
     
     def root_note(self, scale=None):
         if scale is None:
@@ -720,7 +777,10 @@ class Guitar_class:
             
         return (scale + 1) * 12 + self.value_guitar_root
 
-    def chord_notes(self, root=None, chord=None, scale=None):
+    def chord_notes(self, chord_position=None, root=None, chord=None, scale=None):
+        if chord_position is None:
+            chord_position = self.chord_position()
+            
         if root is None:
             root = self.root_note(scale)
 
@@ -732,8 +792,8 @@ class Guitar_class:
         root_name = self.PARAM_GUITAR_ROOTs[root % 12]
         chord_name = root_name + self.PARAM_GUITAR_CHORDs[chord]
         notes = []
-        print('CHORD NAME: ', chord_name, self.CHORD_STRUCTURE[chord_name])
-        fret_map = self.CHORD_STRUCTURE[chord_name]
+        print('CHORD NAME: ', chord_name, self.CHORD_STRUCTURE[chord_name][chord_position])
+        fret_map = self.CHORD_STRUCTURE[chord_name][chord_position]
         for strings in list(range(6)):
             note = self.guitar_string_note(strings, fret_map[strings])
             if note is not None:
@@ -748,13 +808,26 @@ class Guitar_class:
             self._display.show_message('---PICO GUITAR---', 0, 0, color)
             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
-            self._display.show_message('PROG : ' + synth.get_instrument_name(self.program_number()), 0, 9, color)
+            self._display.show_message('PROG : ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 9, color)
             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
-            self._display.show_message('ROOT : ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 18, color)
-            
-        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORD:
-            self._display.show_message('CHORD: ' + self.PARAM_GUITAR_CHORDs[self.value_guitar_chord], 0, 27, color)
+            self._display.show_message('CHD-' + ('L' if self.chord_position() == 0 else 'H') + ': ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 18, color)
+
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORD or param == self.PARAM_GUITAR_ROOT:
+            self._display.show_message(self.PARAM_GUITAR_CHORDs[self.value_guitar_chord], 54, 18, color)
+            notes = self.chord_notes()
+            print('NOTS=', notes)
+            for i in list(range(6)):
+                nt = notes[5-i]
+                if nt < 0:
+                    st = 'xx '
+                else:
+                    st = synth.get_note_name(nt)
+                    if len(st) <= 2:
+                        st = st + ' '
+                
+                for y in list(range(3)):
+                    self._display.show_message(st[y], 80 + i * 8, 18 + y * 9, color)
 
         self._display.show()
 
@@ -764,14 +837,14 @@ class Guitar_class:
         # Notes off (previous chord)
         if self._chord_changed:
             if self._notes_off is not None:
-                if chord_note in self._notes_off:
+                for chord_note in self._notes_off:
                     synth.set_note_off(chord_note, 0)
                     self._notes_off.remove(chord_note)
-                    if len(self._notes_off) == 0:
-                        self._notes_off = None
-                        
                     sleep(0.001)
 
+                if len(self._notes_off) == 0:
+                    self._notes_off = None
+                        
             self._chord_changed = False
 
         # Play strings in the current chord
@@ -780,14 +853,15 @@ class Guitar_class:
         if chord_note >= 0:
             # Note off
             if self._notes_off is not None:
-                if chord_note in self._notes_off:
+                off_notes = self._notes_off
+                if chord_note in off_notes:
                     synth.set_note_off(chord_note, 0)
                     self._notes_off.remove(chord_note)
-                    if len(self._notes_off) == 0:
-                        self._notes_off = None
-                        
                     sleep(0.001)
 
+                if len(self._notes_off) == 0:
+                    self._notes_off = None
+                        
             # Note on
             if string_velosity > 0:
                 synth.set_note_on(chord_note, string_velosity, 0)
@@ -798,21 +872,22 @@ class Guitar_class:
 
         return chord_note
 
-    # Play strings
+    # Play strings with each velocities
     #   string_velosities: [-1,0,127,63,85,-1] ---> String 6=Ignore, 5=Note off, 4=Note on in velosity 127,...
     def play_strings(self, string_velosities):
         print('PLAY STRINGS:', string_velosities)
         # Notes off (previous chord)
         if self._chord_changed:
             if self._notes_off is not None:
-                if chord_note in self._notes_off:
+                off_notes = self._notes_off
+                for chord_note in off_notes:
                     synth.set_note_off(chord_note, 0)
                     self._notes_off.remove(chord_note)
-                    if len(self._notes_off) == 0:
-                        self._notes_off = None
-                        
                     sleep(0.001)
 
+                if len(self._notes_off) == 0:
+                    self._notes_off = None
+                        
             self._chord_changed = False
 
         # Play strings in the current chord
@@ -822,14 +897,15 @@ class Guitar_class:
             if chord_note >= 0:
                 # Note off
                 if self._notes_off is not None:
-                    if chord_note in self._notes_off:
+                    off_notes = self._notes_off
+                    for chord_note in off_notes:
                         synth.set_note_off(chord_note, 0)
                         self._notes_off.remove(chord_note)
-                        if len(self._notes_off) == 0:
-                            self._notes_off = None
-                            
                         sleep(0.001)
 
+                    if len(self._notes_off) == 0:
+                        self._notes_off = None
+                            
                 # Note on
                 if string_velosities[string] > 0:
                     synth.set_note_on(chord_note, string_velosities[string], 0)
@@ -860,6 +936,7 @@ class Guitar_class:
                 else:
                     sleep(0.006)
 
+            # Notes in chord off
             else:
                 # Notes off
                 if self._notes_off is not None:
@@ -889,55 +966,37 @@ class Guitar_class:
 
             led_flush = False
             print('EXCEPTION: ', e)
-            
 
     def do_task(self):
         try:
-            # Play a chord selected
-            if input_device.device_info('GUITAR_PLAY') == False:
-                if self._notes_on is None:
-                    pico_led.value = True                    
-                    self._notes_on = self.chord_notes()
-                    
-                    print('CHORD NOTEs ON : ', self._notes_on)
-#                    self._display.fill_rect(0, 27, 128, 18, 0)
-#                    self.show_message(str(self._notes_on), 0, 27, color=1)
-#                    self._display.show()
+            # Chord position (Low/High)
+            if input_device.device_info('GUITAR_CHORD_POSITION') == False:
+                print('CHORD POSITION')
+                self.chord_position(self.chord_position() + 1)
+                self._chord_changed = True
+                self.show_settings(self.PARAM_GUITAR_ROOT, 1)
 
-                    for nt in self._notes_on:
-                        if nt >= 0:
-                            synth.set_note_on(nt, 127, 0)
-                            if self._notes_off is None:
-                                self._notes_off = []
-                            self._notes_off.append(nt)
-                            sleep(0.001)
-#                            print('NOTE ON : ', nt)
+            # Program change
+            if input_device.device_info('GUITAR_INSTRUMENT') == False:
+                print('CHANGE INSTRUMENT')
+                self.program_number(self.program_number()[0] + 1)
+                synth.set_program_change(self.program_number()[1], 0) 
+                self.show_settings(self.PARAM_ALL, 1)
 
-                    pico_led.value = False
+            # Root change
+            if input_device.device_info('GUITAR_ROOT_SELECTOR') == False:
+                print('ROOT CHANGE')
+                self.value_guitar_root = (self.value_guitar_root + 1) % len(self.PARAM_GUITAR_ROOTs)
+                self._chord_changed = True
+                self.show_settings(self.PARAM_GUITAR_ROOT, 1)
+
+            # Chord change
+            if input_device.device_info('GUITAR_CHORD_SELECTOR') == False:
+                print('CHORD CHANGE')
+                self.value_guitar_chord = (self.value_guitar_chord + 1) % len(self.PARAM_GUITAR_CHORDs)
+                self._chord_changed = True
+                self.show_settings(self.PARAM_GUITAR_CHORD, 1)
                 
-                else:
-                    sleep(0.006)
-
-            else:
-                if self._notes_off is not None:
-                    pico_led.value = True                    
-                    print('CHORD NOTEs OFF: ', self._notes_off)
-#                    self._display.fill_rect(0, 27, 128, 18, 1)
-#                    self.show_message(str(self._notes_off), 0, 36, color=0)
-#                    self._display.show()
-                    for nt in self._notes_off:
-                        if nt >= 0:
-                            synth.set_note_off(nt, 0)
-                            sleep(0.001)
-#                            print('NOTE OFF: ', nt)
-                        
-                    self._notes_on  = None
-                    self._notes_off = None
-                    pico_led.value  = False                    
-                
-                else:
-                    sleep(0.006)
-
             # Effector
             if input_device.device_info('GUITAR_EFFECTOR') == False:
                 print('EFFECT ON')
@@ -960,20 +1019,6 @@ class Guitar_class:
 #                self.set_vibrate(64, 0, 0, 0)
 #                self.set_chorus(0, 0, 0, 0, 0)
 #                sleep(1.0)
-
-            # Root change
-            if input_device.device_info('GUITAR_ROOT_SELECTOR') == False:
-                print('ROOT CHANGE')
-                self.value_guitar_root = (self.value_guitar_root + 1) % len(self.PARAM_GUITAR_ROOTs)
-                self._chord_changed = True
-                self.show_settings(self.PARAM_GUITAR_ROOT, 1)
-
-            # Chord change
-            if input_device.device_info('GUITAR_CHORD_SELECTOR') == False:
-                print('CHORD CHANGE')
-                self.value_guitar_chord = (self.value_guitar_chord + 1) % len(self.PARAM_GUITAR_CHORDs)
-                self._chord_changed = True
-                self.show_settings(self.PARAM_GUITAR_CHORD, 1)
                 
         except Exception as e:
             led_flush = False
@@ -1127,6 +1172,8 @@ class Drum_class:
 #######################
 class Application_class:
     def __init__(self, display_obj):
+        self._DEBUG_MODE = False
+        
         self._display = display_obj
         self._channel = 0
         
@@ -1326,7 +1373,7 @@ class ADC_Device_class:
             if self._note_on_ticks[string] >= 0:
                 from_note_on[string] = ticks_diff(current_ticks, self._note_on_ticks[string])
 
-        print('TICK: ' + str(from_note_on))
+#        print('TICK: ' + str(from_note_on))
 #        display.fill_rect(0, 46, 128, 9, 0)
 #        display.text('TICK:' + str(from_note_on), 0, 46, 1)
 #        display.show()
@@ -1398,9 +1445,6 @@ class ADC_Device_class:
                         instrument_guitar.play_chord(False)
                         self._play_chord = False
                         self._note_on_ticks[string] = -1
-#                        display.fill_rect(0, 55, 128, 9, 0)
-#                        display.text('CHORD OFF to CHANGE', 0, 55, 1)
-#                        display.show()
                         
                     print('PLAY CHORD')
                     instrument_guitar.play_chord(True, velosity)
@@ -1411,9 +1455,29 @@ class ADC_Device_class:
                         self._mute_string = False
                         display.fill_rect(0, 55, 128, 9, 0)
                         display.show()
-#                    display.fill_rect(0, 55, 128, 9, 0)
-#                    display.text('CHORD ON ' + str(velosity), 0, 55, 1)
-#                    display.show()
+                    
+                # Pad 6
+                elif string == 6:
+#                    application._DEBUG_MODE = not application._DEBUG_MODE
+#                    application.show_message('DEBUG:' + ('on' if application._DEBUG_MODE else 'off'), 0, 54, 1)
+                    for i in list(range(50)):
+                        sleep(0.25)
+                        
+                        if self._play_chord:
+                            print('PLAY CHORD OFF')
+                            instrument_guitar.play_chord(False)
+                            self._play_chord = False
+                            self._note_on_ticks[string] = -1
+                            
+                        print('PLAY CHORD')
+                        instrument_guitar.play_chord(True, velosity)
+                        self._play_chord = True
+                        self._note_on_ticks[string] = current_ticks
+
+                        if self._mute_string:
+                            self._mute_string = False
+                            display.fill_rect(0, 55, 128, 9, 0)
+                            display.show()
 
 
 async def main():
