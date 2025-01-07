@@ -25,6 +25,7 @@
 #            Instrument change.
 #     0.2.3: 01/07/2025
 #            Fixing problem sending too many Note On events (chattering)
+#            Guitar note name bug fixed.
 #########################################################################
 
 import asyncio
@@ -818,7 +819,8 @@ class Guitar_class:
         for strings in list(range(6)):
             note = self.guitar_string_note(strings, fret_map[strings])
             if note is not None:
-                notes.append(note + root)
+#                notes.append(note + root)
+                notes.append(note + (self._scale_number + 1) * 12)
             else:
                 notes.append(-1)
             
