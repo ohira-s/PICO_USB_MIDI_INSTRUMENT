@@ -23,6 +23,8 @@
 #     0.2.2: 01/06/2025
 #            Guitar low and high chords.
 #            Instrument change.
+#     0.2.3: 01/07/2025
+#            Fixing problem sending too many Note On events (chattering)
 #########################################################################
 
 import asyncio
@@ -71,18 +73,18 @@ async def catch_pin_transitions(pin, pin_name, callback_pressed=None, callback_r
             event = keys.events.get()
             if event:
                 if event.pressed:
-                    print("pin went low")
+                    print("pin went low: " + pin_name)
                     if callback_pressed is not None:
                         callback_pressed(pin_name)
                         
                 elif event.released:
-                    print("pin went high")
+                    print("pin went high: " + pin_name)
                     if callback_released is not None:
                         callback_released(pin_name)
 
             # Gives away process time to the other tasks.
             # If there is no task, let give back process time to me.
-            await asyncio.sleep(0)
+            await asyncio.sleep(0.1)
 
 
 ##########################################
@@ -94,7 +96,7 @@ async def catch_adc_voltage(adc):
 
         # Gives away process time to the other tasks.
         # If there is no task, let give back process time to me.
-        await asyncio.sleep(0)
+        await asyncio.sleep(0.06)
 
 
 led_status = True
@@ -255,6 +257,7 @@ class OLED_SSD1306_class:
 ################################
 ### Unit-MIDI Instrument class
 ################################
+send_note_on = []
 class USB_MIDI_Instrument_class:
     # Constructor
     def __init__(self):
@@ -280,7 +283,9 @@ class USB_MIDI_Instrument_class:
 
         # USB MIDI device
         print('USB MIDI:', usb_midi.ports)
+        self._send_note_on = [[]] * 16
         self._usb_midi = [None] * 16
+#        self._usb_midi[0] = adafruit_midi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1], out_channel=0)
         for channel in list(range(16)):
             self._usb_midi[channel] = adafruit_midi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1], out_channel=channel)
 
@@ -368,6 +373,22 @@ class USB_MIDI_Instrument_class:
 
     # MIDI sends to USB as a USB device
     def midi_send(self, midi_msg, channel=0):
+        if isinstance(midi_msg, NoteOn):
+            if midi_msg.note in self._send_note_on[channel]:
+                self.set_note_off(midi_msg.note, channel)
+                print('NOTE OFF:' + str(midi_msg.note))
+                return
+
+            self._send_note_on[channel].append(midi_msg.note)
+            print('SEND NOTE ON :' + str(midi_msg.note) + ' ONS=' + str(self._send_note_on[channel]))
+            
+        elif isinstance(midi_msg, NoteOff):
+            if midi_msg.note in self._send_note_on[channel]:
+                self._send_note_on[channel].remove(midi_msg.note)
+                print('SEND NOTE OFF:' + str(midi_msg.note) + ' ONS=' + str(self._send_note_on[channel]))
+            else:
+                return
+            
 #        print('SEND:', channel, midi_msg)
         self._usb_midi[channel % 16].send(midi_msg)
 #        print('SENT')
@@ -816,7 +837,7 @@ class Guitar_class:
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORD or param == self.PARAM_GUITAR_ROOT:
             self._display.show_message(self.PARAM_GUITAR_CHORDs[self.value_guitar_chord], 54, 18, color)
             notes = self.chord_notes()
-            print('NOTS=', notes)
+            print('NOTES=', notes)
             for i in list(range(6)):
                 nt = notes[5-i]
                 if nt < 0:
@@ -840,7 +861,7 @@ class Guitar_class:
                 for chord_note in self._notes_off:
                     synth.set_note_off(chord_note, 0)
                     self._notes_off.remove(chord_note)
-                    sleep(0.001)
+##                    sleep(0.001)
 
                 if len(self._notes_off) == 0:
                     self._notes_off = None
@@ -857,7 +878,8 @@ class Guitar_class:
                 if chord_note in off_notes:
                     synth.set_note_off(chord_note, 0)
                     self._notes_off.remove(chord_note)
-                    sleep(0.001)
+##                    sleep(0.001)
+
 
                 if len(self._notes_off) == 0:
                     self._notes_off = None
@@ -868,7 +890,7 @@ class Guitar_class:
                 if self._notes_off is None:
                     self._notes_off = []
                 self._notes_off.append(chord_note)
-                sleep(0.001)
+##                sleep(0.001)
 
         return chord_note
 
@@ -883,7 +905,7 @@ class Guitar_class:
                 for chord_note in off_notes:
                     synth.set_note_off(chord_note, 0)
                     self._notes_off.remove(chord_note)
-                    sleep(0.001)
+##                    sleep(0.001)
 
                 if len(self._notes_off) == 0:
                     self._notes_off = None
@@ -901,7 +923,7 @@ class Guitar_class:
                     for chord_note in off_notes:
                         synth.set_note_off(chord_note, 0)
                         self._notes_off.remove(chord_note)
-                        sleep(0.001)
+##                        sleep(0.001)
 
                     if len(self._notes_off) == 0:
                         self._notes_off = None
@@ -912,7 +934,7 @@ class Guitar_class:
                     if self._notes_off is None:
                         self._notes_off = []
                     self._notes_off.append(chord_note)
-                    sleep(0.001)
+##                    sleep(0.001)
 
     def play_chord(self, play=True, velosity=127):
         try:
@@ -929,12 +951,12 @@ class Guitar_class:
                             if self._notes_off is None:
                                 self._notes_off = []
                             self._notes_off.append(nt)
-                            sleep(0.001)
+##                            sleep(0.001)
 
                     pico_led.value = False
                 
-                else:
-                    sleep(0.006)
+##                else:
+##                    sleep(0.006)
 
             # Notes in chord off
             else:
@@ -945,15 +967,15 @@ class Guitar_class:
                     for nt in self._notes_off:
                         if nt >= 0:
                             synth.set_note_off(nt, 0)
-                            sleep(0.001)
+##                            sleep(0.001)
                         
                     self._notes_on  = None
                     self._notes_off = None
                     self._chord_changed = False
                     pico_led.value  = False                    
-                
-                else:
-                    sleep(0.006)
+
+##                else:
+##                    sleep(0.006)
 
                 self._chord_changed = False
 
@@ -1388,7 +1410,8 @@ class ADC_Device_class:
 #                print('STRING ' + str(string) + ': ' + str(voltage))
 
             # Note on time out
-            if from_note_on[string] >= 1500:
+            if from_note_on[string] >= 3000:
+##            if from_note_on[string] == -99999:
                 if string <= 5:
                     if self._note_on[string]:
                         self._note_on[string] = False
@@ -1406,7 +1429,6 @@ class ADC_Device_class:
 
             # Pad is tapped
             if velosity >= self._voltage_gate[string]:
-                            
                 # Velosity
                 velosity = int(velosity / 3.5)
                 if velosity > 127:
@@ -1414,14 +1436,14 @@ class ADC_Device_class:
                 
                 velosity = velosity_curve(velosity)
                 
-                # Note on
+                # Play a string
                 if string <= 5:
                     # Play a string
                     if self._note_on[string]:
                         print('PLAY a STRING OFF:', 5 - string)
                         self._note_on[string] = False
                         self._note_on_ticks[string] = -1
-                        instrument_guitar.play_a_string(5 - string, 0)
+###                        instrument_guitar.play_a_string(5 - string, 0)
 
                     print('PLAY a STRING:', 5 - string)
                     self._note_on[string] = True
@@ -1458,28 +1480,27 @@ class ADC_Device_class:
                     
                 # Pad 6
                 elif string == 6:
-#                    application._DEBUG_MODE = not application._DEBUG_MODE
-#                    application.show_message('DEBUG:' + ('on' if application._DEBUG_MODE else 'off'), 0, 54, 1)
-                    for i in list(range(50)):
-                        sleep(0.25)
-                        
-                        if self._play_chord:
-                            print('PLAY CHORD OFF')
-                            instrument_guitar.play_chord(False)
-                            self._play_chord = False
-                            self._note_on_ticks[string] = -1
+                    application._DEBUG_MODE = not application._DEBUG_MODE
+                    application.show_message('DEBUG:' + ('on' if application._DEBUG_MODE else 'off'), 0, 54, 1)
                             
-                        print('PLAY CHORD')
-                        instrument_guitar.play_chord(True, velosity)
-                        self._play_chord = True
-                        self._note_on_ticks[string] = current_ticks
+            # Pad has released
+##            else:
+##                # Note off a string
+##                if string <= 5:
+##                    if self._note_on[string] and from_note_on[string] >= 1500:
+##                        self._note_on[string] = False
+##                        self._note_on_ticks[string] = -1
+##                        instrument_guitar.play_a_string(5 - string, 0)
+##                        
+##                # Note chord off
+##                elif string == 7:
+##                    if self._play_chord and from_note_on[string] >= 1500:
+##                        instrument_guitar.play_chord(False)
+##                        self._play_chord = False
+##                        self._note_on_ticks[string] = -1
 
-                        if self._mute_string:
-                            self._mute_string = False
-                            display.fill_rect(0, 55, 128, 9, 0)
-                            display.show()
 
-
+# Asyncronous functions
 async def main():
     interrupt_task1 = asyncio.create_task(catch_pin_transitions(board.GP18, 'BUTTON_3', input_device.button_pressed, input_device.button_released))
     interrupt_task2 = asyncio.create_task(catch_pin_transitions(board.GP19, 'BUTTON_4', input_device.button_pressed, input_device.button_released))
