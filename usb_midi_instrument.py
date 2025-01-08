@@ -28,6 +28,8 @@
 #            Guitar note name bug fixed.
 #     0.2.4: 01/08/2025
 #            8 buttons as digital inputs are available.
+#     0.3.0: 01/08/2025
+#            Separate play mode and settings mode.
 #########################################################################
 
 import asyncio
@@ -58,7 +60,6 @@ import supervisor
 import adafruit_ssd1306			# for SSD1306 OLED Display
 
 import busio
-import sdcardio
 import storage
 
 from analogio import AnalogIn
@@ -110,87 +111,6 @@ async def led_flush():
         pico_led.value = led_status
 
         await asyncio.sleep(1.0)
-
-
-###################
-### SD card class
-###################
-class sdcard_class:
-  # Constructor
-  def __init__(self):
-    self.file_opened = None
-
-  # Initialize SD Card device (MOSI=TX, MISO=RX)
-  def setup(self, spi_unit=0, sck_pin=GP18, mosi_pin=GP19, miso_pin=GP16, cs_pin=GP17):
-    print('SD CARD INIT.')
-    spi = busio.SPI(sck_pin, MOSI=mosi_pin, MISO=miso_pin)
-    sd = sdcardio.SDCard(spi, cs_pin)
-
-    vfs = storage.VfsFat(sd)
-    storage.mount(vfs, '/SD')
-
-    fp = open('/SD/SYNTH/MIDIUNIT/MIDISET000.json', 'r')
-    print(fp.read())
-    fp.close()
-    print('SD CARD INIT done.')
-
-  # Opened file
-  def file_opened(self):
-    return self.file_opened
-
-  # File open, needs to close the file
-  def file_open(self, path, fname, mode = 'r'):
-    try:
-      if not self.file_opened is None:
-        self.file_opened.close()
-        self.file_opened = None
-
-      self.file_opened = open(path + fname, mode)
-      return self.file_opened
-
-    except Exception as e:
-      self.file_opened = None
-      print('sccard_class.file_open Exception:', e, path, fname, mode)
-
-    return None
-
-  # Close the file opened currently
-  def file_close(self):
-    try:
-      if not self.file_opened is None:
-        self.file_opened.close()
-
-    except Exception as e:
-      print('sccard_class.file_open Exception:', e, path, fname, mode)
-
-    self.file_opened = None
-
-  # Read JSON format file, then retun JSON data
-  def json_read(self, path, fname):
-    json_data = None
-    try:
-      with open(path + fname, 'r') as f:
-        json_data = json.load(f)
-
-    except Exception as e:
-      print('sccard_class.json_read Exception:', e, path, fname)
-
-    return json_data
-
-  # Write JSON format file
-  def json_write(self, path, fname, json_data):
-    try:
-      with open(path + fname, 'w') as f:
-        json.dump(json_data, f)
-
-      return True
-
-    except Exception as e:
-      print('sccard_class.json_write Exception:', e, path, fname)
-
-    return False
-
-################# End of SD Card Class Definition #################
 
 
 ########################
@@ -467,7 +387,7 @@ class Input_Devices_class:
     def device_alias(self, alias_name, device_name=None):
         if device_name is not None:
             self._device_alias[alias_name] = device_name
-            
+        
         return self._device_alias[alias_name]
 
     # Get a device information
@@ -540,17 +460,6 @@ class USB_MIDI_Instrument_class:
             return '---'
 
         try:
-#            # SD card file system
-#            f = sdcard.file_open('/SD/SYNTH/MIDIFILE/', 'GM0.TXT', 'r')
-#            prg = -1
-#            for instrument in f:
-#                prg = prg + 1
-#                if prg == program:
-#                    sdcard.file_close()
-#                    return instrument
-#
-#            sdcard.file_close()
-            
             # PICO internal memory file system
             with open('SYNTH/MIDIFILE/GM0.TXT', 'r') as f:
                 prg = -1
@@ -568,7 +477,7 @@ class USB_MIDI_Instrument_class:
                 sleep(0.5)
 
             display.clear()
-            application.show_settings()
+            application.show_info()
 
         return '???'
 
@@ -603,7 +512,7 @@ class USB_MIDI_Instrument_class:
                 sleep(0.5)
 
             display.clear()
-            application.show_settings()
+            application.show_info()
 
         return '???'
 
@@ -923,17 +832,35 @@ class Guitar_class:
         self._notes_on  = None
         self._notes_off = None
 
+        # Chord on button
+        self._chord_on_button = [
+                {'ROOT': 0, 'CHORD': 0, 'POSITION': 0, 'SCALE': 4},		# CM Low
+                {'ROOT': 7, 'CHORD': 0, 'POSITION': 0, 'SCALE': 4},		# GM Low
+                {'ROOT': 9, 'CHORD': 5, 'POSITION': 0, 'SCALE': 4},		# Am Low
+                {'ROOT': 4, 'CHORD': 5, 'POSITION': 0, 'SCALE': 4},		# Em Low
+                {'ROOT': 5, 'CHORD': 0, 'POSITION': 0, 'SCALE': 4},		# FM Low
+                {'ROOT': 2, 'CHORD': 5, 'POSITION': 0, 'SCALE': 4},		# Dm Low
+                {'ROOT': 0, 'CHORD': 0, 'POSITION': 1, 'SCALE': 4}		# CM High
+            ]
+
         # Device aliases
-        input_device.device_alias('GUITAR_ROOT_SELECTOR', 'BUTTON_1')
-        input_device.device_alias('GUITAR_CHORD_SELECTOR', 'BUTTON_2')
-        input_device.device_alias('GUITAR_CHORD_POSITION', 'BUTTON_3')
-        input_device.device_alias('GUITAR_INSTRUMENT', 'BUTTON_4')
-        input_device.device_alias('GUITAR_EFFECTOR', 'BUTTON_5')
+        input_device.device_alias('GUITAR_CHORD1', 'BUTTON_1')
+        input_device.device_alias('GUITAR_CHORD2', 'BUTTON_2')
+        input_device.device_alias('GUITAR_CHORD3', 'BUTTON_3')
+        input_device.device_alias('GUITAR_CHORD4', 'BUTTON_4')
+        input_device.device_alias('GUITAR_CHORD5', 'BUTTON_5')
+        input_device.device_alias('GUITAR_CHORD6', 'BUTTON_6')
+        input_device.device_alias('GUITAR_CHORD7', 'BUTTON_7')
 
     def setup(self):
         display.fill(0)
         synth.set_program_change(self.program_number()[1], 0) 
-        self.show_settings(self.PARAM_ALL, 1)
+        self.show_info(self.PARAM_ALL, 1)
+
+    def setup_settings(self):
+        display.fill(0)
+        synth.set_program_change(self.program_number()[1], 0) 
+        self.show_info(self.PARAM_ALL, 1)
 
     def program_number(self, prog=None):
         if prog is not None:
@@ -959,6 +886,14 @@ class Guitar_class:
             return instrument
         
         return instrument[0:guitar_pos][0:guitar_pos - dels] + instrument[guitar_pos:]
+
+    def set_chord_on_button(self, button):
+        button_data = self._chord_on_button[button]
+        self.value_guitar_root = button_data['ROOT']		# Current root
+        self.value_guitar_chord = button_data['CHORD']		# Current chord
+        self._chord_position = button_data['POSITION']		# 0: Low chord, 1: High chord
+        self._scale_number = button_data['SCALE']
+        self._chord_changed = False
 
     def guitar_string_note(self, strings, frets):
         if frets < 0:
@@ -1017,18 +952,19 @@ class Guitar_class:
             
         return notes
 
-    def show_settings(self, param, color):
+    def show_info(self, param, color):
         if param == self.PARAM_ALL:
-            self._display.show_message('---PICO GUITAR---', 0, 0, color)
+            self._display.show_message('---GUITAR PLAY---', 0, 0, color)
             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
-            self._display.show_message('PROG : ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 9, color)
+            self._display.show_message(self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 45, color)
             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
-            self._display.show_message('CHD-' + ('L' if self.chord_position() == 0 else 'H') + ': ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 18, color)
+            self._display.show_message(self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 9, color)
+            self._display.show_message('  ' + ('Low' if self.chord_position() == 0 else 'High'), 0, 18, color)
 
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORD or param == self.PARAM_GUITAR_ROOT:
-            self._display.show_message(self.PARAM_GUITAR_CHORDs[self.value_guitar_chord], 54, 18, color)
+            self._display.show_message(self.PARAM_GUITAR_CHORDs[self.value_guitar_chord], 12, 9, color)
             notes = self.chord_notes()
             print('NOTES=', notes)
             for i in list(range(6)):
@@ -1041,7 +977,22 @@ class Guitar_class:
                         st = st + ' '
                 
                 for y in list(range(3)):
-                    self._display.show_message(st[y], 80 + i * 8, 18 + y * 9, color)
+                    self._display.show_message(st[y], 40 + i * 16, 9 + y * 9, color)
+
+        self._display.show()
+
+    def show_info_settings(self, param, color):
+        if param == self.PARAM_ALL:
+            self._display.show_message('--GUITAR SETTINGS--', 0, 0, color)
+            
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
+            self._display.show_message('INST : ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 45, color)
+            
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
+            self._display.show_message('CHORD: ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 9, color)
+
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORD or param == self.PARAM_GUITAR_ROOT:
+            self._display.show_message(self.PARAM_GUITAR_CHORDs[self.value_guitar_chord] + (' Low' if self.chord_position() == 0 else ' High'), 54, 9, color)
 
         self._display.show()
 
@@ -1184,45 +1135,52 @@ class Guitar_class:
 
     def do_task(self):
         try:
-            # Chord position (Low/High)
-            if input_device.device_info('GUITAR_CHORD_POSITION') == False:
-                print('CHORD POSITION')
-                self.chord_position(self.chord_position() + 1)
-                self._chord_changed = True
-                self.show_settings(self.PARAM_GUITAR_ROOT, 1)
+            if input_device.device_info('GUITAR_CHORD1') == False:
+                print('CHORD1')
+                self.set_chord_on_button(0)
+                self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
-            # Program change
-            if input_device.device_info('GUITAR_INSTRUMENT') == False:
-                print('CHANGE INSTRUMENT')
-                self.program_number(self.program_number()[0] + 1)
-                synth.set_program_change(self.program_number()[1], 0) 
-                self.show_settings(self.PARAM_ALL, 1)
+            if input_device.device_info('GUITAR_CHORD2') == False:
+                print('CHORD2')
+                self.set_chord_on_button(1)
+                self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
-            # Root change
-            if input_device.device_info('GUITAR_ROOT_SELECTOR') == False:
-                print('ROOT CHANGE')
-                self.value_guitar_root = (self.value_guitar_root + 1) % len(self.PARAM_GUITAR_ROOTs)
-                self._chord_changed = True
-                self.show_settings(self.PARAM_GUITAR_ROOT, 1)
+            if input_device.device_info('GUITAR_CHORD3') == False:
+                print('CHORD3')
+                self.set_chord_on_button(2)
+                self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
-            # Chord change
-            if input_device.device_info('GUITAR_CHORD_SELECTOR') == False:
-                print('CHORD CHANGE')
-                self.value_guitar_chord = (self.value_guitar_chord + 1) % len(self.PARAM_GUITAR_CHORDs)
-                self._chord_changed = True
-                self.show_settings(self.PARAM_GUITAR_CHORD, 1)
+            if input_device.device_info('GUITAR_CHORD4') == False:
+                print('CHORD4')
+                self.set_chord_on_button(3)
+                self.show_info(self.PARAM_GUITAR_ROOT, 1)
+
+            if input_device.device_info('GUITAR_CHORD5') == False:
+                print('CHORD5')
+                self.set_chord_on_button(4)
+                self.show_info(self.PARAM_GUITAR_ROOT, 1)
+
+            if input_device.device_info('GUITAR_CHORD6') == False:
+                print('CHORD6')
+                self.set_chord_on_button(5)
+                self.show_info(self.PARAM_GUITAR_ROOT, 1)
+
+            if input_device.device_info('GUITAR_CHORD7') == False:
+                print('CHORD7')
+                self.set_chord_on_button(6)
+                self.show_info(self.PARAM_GUITAR_ROOT, 1)
                 
             # Effector
-            if input_device.device_info('GUITAR_EFFECTOR') == False:
-                print('EFFECT ON')
-                sleep(0.25)
-                synth.set_pitch_bend( 9000, 0)
-                sleep(0.25)
-                synth.set_pitch_bend(12000, 0)
-                sleep(0.25)
-                synth.set_pitch_bend(15000, 0)
-                sleep(0.25)
-                synth.set_pitch_bend( 8192, 0)
+#            if input_device.device_info('GUITAR_EFFECTOR') == False:
+#                print('EFFECT ON')
+#                sleep(0.25)
+#                synth.set_pitch_bend( 9000, 0)
+#                sleep(0.25)
+#                synth.set_pitch_bend(12000, 0)
+#                sleep(0.25)
+#                synth.set_pitch_bend(15000, 0)
+#                sleep(0.25)
+#                synth.set_pitch_bend( 8192, 0)
 
 #                self.set_modulation_wheel(1, 127, 0)
 #                sleep(4.0)
@@ -1248,6 +1206,9 @@ class Guitar_class:
 #            display.show()
 #            display.text('EXCEPTION: MIDI-IN', 0, 0, 1)
 #            display.show()
+
+    def do_task_settings(self):
+        print('GUITAR SETTINGS')
 
 ################# End of Guitar Class Definition #################
 
@@ -1276,9 +1237,13 @@ class Drum_class:
 
     def setup(self):
         display.fill(0)
-        self.show_settings(self.PARAM_ALL, 1)
+        self.show_info(self.PARAM_ALL, 1)
 
-    def show_settings(self, param, color):
+    def setup_settings(self):
+        display.fill(0)
+        self.show_info(self.PARAM_ALL, 1)
+
+    def show_info(self, param, color):
         if param == self.PARAM_ALL:
             self._display.show_message('---PICO DRUM---', 0, 0, color)
             
@@ -1295,6 +1260,9 @@ class Drum_class:
             self._display.show_message('DRUM4: ' + synth.get_drumset_name(self.drum_program(3)), 0, 36, color)
 
         self._display.show()
+
+    def show_info_settings(self, param, color):
+        self.show_info(param, color)
         
     def drum_program(self, drum_num, prog=None):
         if prog is not None:
@@ -1378,6 +1346,8 @@ class Drum_class:
             led_flush = False
             print('EXCEPTION: ', e)
 
+    def do_task_settings(self):
+        print('DRUM SETTINGS')
 
 ################# End of Drum Class Definition #################
  
@@ -1392,15 +1362,27 @@ class Application_class:
         self._display = display_obj
         self._channel = 0
         
-        self.INSTRUMENT_GUITAR = 0
-        self.INSTRUMENT_DRUM = 1
-        self._instrument = self.INSTRUMENT_GUITAR
+        self.PLAY_GUITAR = 0
+        self.GUITAR_SETTINGS = 1
+        self.PLAY_DRUM = 2
+        self.DRUM_SETTINGS = 3
+        self._screen_mode = self.PLAY_GUITAR
+
+        # Device aliases
+        input_device.device_alias('CHORD_1', 'BUTTON_1')
+        input_device.device_alias('CHORD_2', 'BUTTON_2')
+        input_device.device_alias('CHORD_3', 'BUTTON_3')
+        input_device.device_alias('CHORD_4', 'BUTTON_4')
+        input_device.device_alias('CHORD_5', 'BUTTON_5')
+        input_device.device_alias('CHORD_6', 'BUTTON_6')
+        input_device.device_alias('CHORD_7', 'BUTTON_7')
+        input_device.device_alias('MODE_CHANGE', 'BUTTON_8')
 
     def setup(self):
-        instrument = self.instrument()
-        if   instrument == self.INSTRUMENT_GUITAR:
+        instrument = self.screen_mode()
+        if   instrument == self.PLAY_GUITAR:
             instrument_guitar.setup()
-        elif instrument == self.INSTRUMENT_DRUM:
+        elif instrument == self.PLAY_DRUM:
             instrument_drum.setup()
 
     def show_message(self, msg, x=0, y=0, color=1):
@@ -1414,40 +1396,60 @@ class Application_class:
             
         return self._channel
 
-    def instrument(self, inst_num=None):
+    def screen_mode(self, inst_num=None):
         if inst_num is not None:
-            self._instrument = inst_num
+            self._screen_mode = inst_num % 3
             
-        return self._instrument
+        return self._screen_mode
 
-    def show_settings(self, param=-1):
-        instrument = self.instrument()
-        if   instrument == self.INSTRUMENT_GUITAR:
-            instrument_guitar.show_settings(param, 1)
-        elif instrument == self.INSTRUMENT_DRUM:
-            instrument_drum.show_settings(param, 1)
+    def show_info(self, param=-1):
+        sc_mode = self.screen_mode()
+        if   sc_mode == self.PLAY_GUITAR:
+            instrument_guitar.show_info(param, 1)
+            
+        elif sc_mode == self.GUITAR_SETTINGS:
+            instrument_guitar.show_info_settings(param, 1)
+            
+        elif sc_mode == self.PLAY_DRUM:
+            instrument_drum.show_info(param, 1)
+            
+        elif sc_mode == self.DRUM_SETTINGS:
+            instrument_drum.show_info_settings(param, 1)
 
 
     # Application task called from asyncio, never call this directly.
     def do_task(self):
-        # Instrument change
-        if input_device.device_info('BUTTON_1') == False and input_device.device_info('BUTTON_2') == False:
-            if   self.instrument() == self.INSTRUMENT_GUITAR:
-                self.instrument(self.INSTRUMENT_DRUM)
-                instrument_drum.setup()
-                
-            elif self.instrument() == self.INSTRUMENT_DRUM:
-                self.instrument(self.INSTRUMENT_GUITAR)
+        # Screen mode change
+        if input_device.device_info('MODE_CHANGE') == False:
+            sc_mode = self.screen_mode(self.screen_mode() + 1)
+            if   sc_mode == self.PLAY_GUITAR:
                 instrument_guitar.setup()
+                
+            elif sc_mode == self.GUITAR_SETTINGS:
+                instrument_guitar.setup_settings()
+            
+            elif sc_mode == self.PLAY_DRUM:
+                instrument_drum.setup()
+            
+            elif sc_mode == self.DRUM_SETTINGS:
+                instrument_drum.setup_settings()
 
-            return
-        
+            display.fill(0)
+            self.show_info()
+
         # Play the current instrument
-        instrument = self.instrument()
-        if   instrument == self.INSTRUMENT_GUITAR:
+        sc_mode = self.screen_mode()
+        if   sc_mode == self.PLAY_GUITAR:
             instrument_guitar.do_task()
-        elif instrument == self.INSTRUMENT_DRUM:
+
+        elif sc_mode == self.GUITAR_SETTINGS:
+            instrument_guitar.do_task_settings()
+
+        elif sc_mode == self.PLAY_DRUM:
             instrument_drum.do_task()
+
+        elif sc_mode == self.DRUM_SETTINGS:
+            instrument_drum.do_task_settings()
 
 
 ################# End of Application Class Definition #################
@@ -1498,10 +1500,6 @@ def setup():
     instrument_guitar = Guitar_class(display)
     instrument_drum = Drum_class(display)    
     application = Application_class(display)
-
-    # SD card
-#    sdcard = sdcard_class()
-#    sdcard.setup()
 
     # Initial screen
     sleep(3.0)
