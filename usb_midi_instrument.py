@@ -32,6 +32,10 @@
 #            Separate play mode and settings mode.
 #     0.4.0: 01/08/2025
 #            Eliminate drum due to memory shortage.
+#     0.4.1: 01/09/2025
+#            Use hysteresis for ADC on/off voltage.
+#            Pitch bend is available.
+#            Design change of play mode screen.
 #########################################################################
 
 import asyncio
@@ -85,7 +89,7 @@ async def catch_pin_transitions(pin, pin_name, callback_pressed=None, callback_r
 
             # Gives away process time to the other tasks.
             # If there is no task, let give back process time to me.
-            await asyncio.sleep(0.08)
+            await asyncio.sleep(0.1)
 
 
 ##########################################
@@ -97,7 +101,7 @@ async def catch_adc_voltage(adc):
 
         # Gives away process time to the other tasks.
         # If there is no task, let give back process time to me.
-        await asyncio.sleep(0.05)
+        await asyncio.sleep(0.01)
 
 
 led_status = True
@@ -204,10 +208,11 @@ class ADC_Device_class:
         self._4051_selectors[2].direction = digitalio.Direction.OUTPUT
 
         self._adc_name = adc_name
-        self._note_on = [False] * 6				# 6 strings on guitar
+        self._note_on = [False] * 7				# 6 strings on guitar, and effector
         self._note_on_ticks = [-1] * 8			# 8 pads on UI (Piezo elements)
         self._play_chord = False
-        self._voltage_gate = [100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+        self._voltage_gate = [(100.0,70.0)] * 8
+        self._adc_on = [False] * 8
 
         self._mute_string = False
 
@@ -265,7 +270,7 @@ class ADC_Device_class:
         for string in list(range(8)):
             voltage = self.get_voltage(string)
 #            print('STR ' + str(string) + ' / VOL=', voltage)
-            velosity = voltage * 1000.0
+            voltage = voltage * 1000.0
             
 #            if string >= 6:
 #                print('STRING ' + str(string) + ': ' + str(voltage))
@@ -278,20 +283,34 @@ class ADC_Device_class:
                         self._note_on[string] = False
                         self._note_on_ticks[string] = -1
                         instrument_guitar.play_a_string(5 - string, 0)
+                        self._adc_on[string] = False
                     
                 elif string == 7:
                     if self._play_chord:
                         instrument_guitar.play_chord(False)
                         self._play_chord = False
                         self._note_on_ticks[string] = -1
+                        self._adc_on[string] = False
 #                        display.fill_rect(0, 55, 128, 9, 0)
 #                        display.text('CHORD OFF by TIMEOUT', 0, 55, 1)
 #                        display.show()
 
+                elif string <= 6:
+                    if self._note_on[string]:
+                        self._note_on[string] = False
+                        self._note_on_ticks[string] = -1
+                        synth.set_pitch_bend( 8192, 0)
+                        self._adc_on[string] = False                    
+                        print('PITCH BEND off')
+
+            # Pad is released
+            if voltage <= self._voltage_gate[string][1]:
+                 self._adc_on[string] = False
+
             # Pad is tapped
-            if velosity >= self._voltage_gate[string]:
+            elif voltage >= self._voltage_gate[string][0] and self._adc_on[string] == False:
                 # Velosity
-                velosity = int(velosity / 3.5)
+                velosity = int(voltage / 3.5)
                 if velosity > 127:
                     velosity = 127
                 
@@ -304,22 +323,31 @@ class ADC_Device_class:
                         print('PLAY a STRING OFF:', 5 - string)
                         self._note_on[string] = False
                         self._note_on_ticks[string] = -1
+                        self._adc_on[string] = False
 ###                        instrument_guitar.play_a_string(5 - string, 0)
+
+                    # Pitch bend off
+                    if self._note_on[6]:
+                        self._note_on[6] = False
+                        self._note_on_ticks[6] = -1
+                        synth.set_pitch_bend( 8192, 0)
+                        self._adc_on[6] = False                    
 
                     print('PLAY a STRING:', 5 - string)
                     self._note_on[string] = True
                     self._note_on_ticks[string] = current_ticks
                     chord_note = instrument_guitar.play_a_string(5 - string, velosity)
+                    self._adc_on[string] = True
 
-                    if chord_note < 0:
-                        self._mute_string = True
-                        display.fill_rect(0, 55, 128, 9, 0)
-                        display.text('Mute String: ' + str(5 - string), 0, 55, 1)
-                        display.show()
-                    elif self._mute_string:
-                        self._mute_string = False
-                        display.fill_rect(0, 55, 128, 9, 0)
-                        display.show()
+##                    if chord_note < 0:
+##                        self._mute_string = True
+##                        display.fill_rect(0, 55, 128, 9, 0)
+##                        display.text('Mute String: ' + str(5 - string), 0, 55, 1)
+##                        display.show()
+##                    elif self._mute_string:
+##                        self._mute_string = False
+##                        display.fill_rect(0, 55, 128, 9, 0)
+##                        display.show()
                     
                 # Play chord
                 elif string == 7:
@@ -328,11 +356,20 @@ class ADC_Device_class:
                         instrument_guitar.play_chord(False)
                         self._play_chord = False
                         self._note_on_ticks[string] = -1
+                        self._adc_on[string] = False
+
+                    # Pitch bend off
+                    if self._note_on[6]:
+                        self._note_on[6] = False
+                        self._note_on_ticks[6] = -1
+                        synth.set_pitch_bend( 8192, 0)
+                        self._adc_on[6] = False                    
                         
                     print('PLAY CHORD')
                     instrument_guitar.play_chord(True, velosity)
                     self._play_chord = True
                     self._note_on_ticks[string] = current_ticks
+                    self._adc_on[string] = True
 
                     if self._mute_string:
                         self._mute_string = False
@@ -341,8 +378,21 @@ class ADC_Device_class:
                     
                 # Pad 6
                 elif string == 6:
-                    application._DEBUG_MODE = not application._DEBUG_MODE
-                    application.show_message('DEBUG:' + ('on' if application._DEBUG_MODE else 'off'), 0, 54, 1)
+##                    application._DEBUG_MODE = not application._DEBUG_MODE
+##                    application.show_message('DEBUG:' + ('on' if application._DEBUG_MODE else 'off'), 0, 54, 1)
+                    if self._note_on[string]:
+                        self._note_on[string] = False
+                        self._note_on_ticks[string] = -1
+                        synth.set_pitch_bend( 8192, 0)
+                        self._adc_on[string] = False                    
+                        print('PITCH BEND OFF')
+
+                    bend_velosity = 9000 + int((7000 / 127) * velosity)
+                    print('PITCH BEND ON:', bend_velosity)
+                    synth.set_pitch_bend(bend_velosity, 0)
+                    self._note_on[string] = True
+                    self._note_on_ticks[string] = current_ticks
+                    self._adc_on[string] = True
 
 ################# End of ADC Class Definition #################
 
@@ -909,7 +959,7 @@ class Guitar_class:
             
         return (scale + 1) * 12 + self.value_guitar_root
 
-    def chord_notes(self, chord_position=None, root=None, chord=None, scale=None):
+    def chord_name(self, chord_position=None, root=None, chord=None, scale=None):
         if chord_position is None:
             chord_position = self.chord_position()
             
@@ -923,6 +973,14 @@ class Guitar_class:
         print('root, chord=', root, chord)
         root_name = self.PARAM_GUITAR_ROOTs[root % 12]
         chord_name = root_name + self.PARAM_GUITAR_CHORDs[chord]
+        print('CHORD NAME: ', chord_name, self.CHORD_STRUCTURE[chord_name][chord_position])
+        return (root_name, chord_name)
+
+    def chord_notes(self, chord_position=None, root=None, chord=None, scale=None):
+        if chord_position is None:
+            chord_position = self.chord_position()
+            
+        (root_name, chord_name) = self.chord_name(chord_position, root, chord, scale)
         notes = []
         print('CHORD NAME: ', chord_name, self.CHORD_STRUCTURE[chord_name][chord_position])
         fret_map = self.CHORD_STRUCTURE[chord_name][chord_position]
@@ -941,14 +999,25 @@ class Guitar_class:
             self._display.show_message('---GUITAR PLAY---', 0, 0, color)
             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
-            self._display.show_message(self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 45, color)
+            x = 0
+            y = 27
+            for i in list(range(len(self._chord_on_button))):
+                button_data = self._chord_on_button[i]
+                (root_name, chord_name) = self.chord_name(button_data['POSITION'], button_data['ROOT'], button_data['CHORD'], button_data['SCALE'])
+
+                if i == 4:
+                    x = 64
+                    y = 36
+                    
+                self._display.show_message(chord_name + ' ' + ('L' if button_data['POSITION'] == 0 else 'H'), x, y + (i % 4) * 9, color)
+                
+            self._display.show_message(self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 18, color)
             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
             self._display.show_message(self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 9, color)
-            self._display.show_message('  ' + ('Low' if self.chord_position() == 0 else 'High'), 0, 18, color)
 
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORD or param == self.PARAM_GUITAR_ROOT:
-            self._display.show_message(self.PARAM_GUITAR_CHORDs[self.value_guitar_chord], 12, 9, color)
+            self._display.show_message(self.PARAM_GUITAR_CHORDs[self.value_guitar_chord] + '  ' + ('L' if self.chord_position() == 0 else 'H'), 12, 9, color)
             notes = self.chord_notes()
             print('NOTES=', notes)
             for i in list(range(6)):
@@ -961,7 +1030,7 @@ class Guitar_class:
                         st = st + ' '
                 
                 for y in list(range(3)):
-                    self._display.show_message(st[y], 40 + i * 16, 9 + y * 9, color)
+                    self._display.show_message(st[y], 80 + i * 8, 9 + y * 9, color)
 
         self._display.show()
 
