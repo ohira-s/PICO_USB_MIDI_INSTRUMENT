@@ -36,6 +36,9 @@
 #            Use hysteresis for ADC on/off voltage.
 #            Pitch bend is available.
 #            Design change of play mode screen.
+#     0.4.2: 01/10/2025
+#            Chord bank is available to extend assigning chords.
+#            Capotasto is available.
 #########################################################################
 
 import asyncio
@@ -816,19 +819,23 @@ class Guitar_class:
         self.PARAM_GUITAR_PROGRAM = 0
         self.PARAM_GUITAR_ROOT = 1
         self.PARAM_GUITAR_CHORD = 2
+        self.PARAM_GUITAR_CHORDSET = 3
+        self.PARAM_GUITAR_CAPOTASTO = 4
         
         self.value_guitar_root = 0		# Current root
         self.value_guitar_chord = 0		# Current chord
         self._chord_changed = False
         
-        self._programs = [-1, 24, 25, 26, 27, 28, 29, 30, 31, 104, 105, 106, 107]
+        self._programs = [-1, 24, 25, 26, 27, 28, 29, 30, 31, 104, 105, 106, 107]	# Instrument number in GM
         self._program_number = 0  		# Steel Guitar
-        self._scale_number = 4
+        self._scale_number = 4			# Normal guitar scale
         self._chord_position = 0		# 0: Low chord, 1: High chord
+        self._capotasto = 0				# No capotasto (-12..0..+12)
         self._notes_on  = None
         self._notes_off = None
 
         # Chord on button
+        self._chord_bank = 0
         self._chord_on_button_number = 0
         self._chord_on_button = [
                 {'ROOT': 0, 'CHORD': 0, 'POSITION': 0, 'SCALE': 4},		# CM Low
@@ -837,17 +844,22 @@ class Guitar_class:
                 {'ROOT': 4, 'CHORD': 5, 'POSITION': 0, 'SCALE': 4},		# Em Low
                 {'ROOT': 5, 'CHORD': 0, 'POSITION': 0, 'SCALE': 4},		# FM Low
                 {'ROOT': 2, 'CHORD': 5, 'POSITION': 0, 'SCALE': 4},		# Dm Low
-                {'ROOT': 0, 'CHORD': 0, 'POSITION': 1, 'SCALE': 4}		# CM High
+                {'ROOT': 0, 'CHORD': 0, 'POSITION': 1, 'SCALE': 4},		# CM High
+                {'ROOT': 7, 'CHORD': 0, 'POSITION': 1, 'SCALE': 4},		# GM High
+                {'ROOT': 9, 'CHORD': 5, 'POSITION': 1, 'SCALE': 4},		# Am High
+                {'ROOT': 4, 'CHORD': 5, 'POSITION': 1, 'SCALE': 4},		# Em High
+                {'ROOT': 5, 'CHORD': 0, 'POSITION': 1, 'SCALE': 4},		# FM High
+                {'ROOT': 2, 'CHORD': 5, 'POSITION': 1, 'SCALE': 4}		# Dm High
             ]
 
         # Device aliases for play mode
-        input_device.device_alias('GUITAR_CHORD1', 'BUTTON_1')
-        input_device.device_alias('GUITAR_CHORD2', 'BUTTON_2')
-        input_device.device_alias('GUITAR_CHORD3', 'BUTTON_3')
-        input_device.device_alias('GUITAR_CHORD4', 'BUTTON_4')
-        input_device.device_alias('GUITAR_CHORD5', 'BUTTON_5')
-        input_device.device_alias('GUITAR_CHORD6', 'BUTTON_6')
-        input_device.device_alias('GUITAR_CHORD7', 'BUTTON_7')
+        input_device.device_alias('GUITAR_CHORD_BANK', 'BUTTON_1')		# Chord set bank
+        input_device.device_alias('GUITAR_CHORD1', 'BUTTON_2')
+        input_device.device_alias('GUITAR_CHORD2', 'BUTTON_3')
+        input_device.device_alias('GUITAR_CHORD3', 'BUTTON_4')
+        input_device.device_alias('GUITAR_CHORD4', 'BUTTON_5')
+        input_device.device_alias('GUITAR_CHORD5', 'BUTTON_6')
+        input_device.device_alias('GUITAR_CHORD6', 'BUTTON_7')
 
         # Device aliases for settings mode
         input_device.device_alias('GUITAR_BUTTON',     'BUTTON_1')
@@ -869,6 +881,17 @@ class Guitar_class:
         self.set_chord_on_button(current_button)
         synth.set_program_change(self.program_number()[1], 0) 
         self.show_info_settings(self.PARAM_ALL, 1)
+
+    def capotasto(self, capo=None):
+        if capo is not None:
+            if capo < -12:
+                capo = 12
+            elif capo > 12:
+                capo = -12
+                
+            self._capotasto = capo
+            
+        return self._capotasto
 
     def program_number(self, prog=None):
         if prog is not None:
@@ -920,6 +943,12 @@ class Guitar_class:
             self._chord_on_button[button]['SCALE'] = scale
         
         return self._chord_on_button[button]
+
+    def chord_bank(self, bank=None):
+        if bank is not None:
+            self._chord_bank = bank % 2
+            
+        return self._chord_bank
 
     def set_chord_on_button(self, button):
         button_data = self._chord_on_button[button]
@@ -998,26 +1027,28 @@ class Guitar_class:
         if param == self.PARAM_ALL:
             self._display.show_message('---GUITAR PLAY---', 0, 0, color)
             
-        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORDSET:
+            bank = self.chord_bank() * 6
             x = 0
-            y = 27
-            for i in list(range(len(self._chord_on_button))):
-                button_data = self._chord_on_button[i]
+            y = 36
+            for i in list(range(6)):
+                button_data = self._chord_on_button[i + bank]
                 (root_name, chord_name) = self.chord_name(button_data['POSITION'], button_data['ROOT'], button_data['CHORD'], button_data['SCALE'])
 
-                if i == 4:
+                if i == 3:
                     x = 64
-                    y = 36
                     
-                self._display.show_message(chord_name + ' ' + ('L' if button_data['POSITION'] == 0 else 'H'), x, y + (i % 4) * 9, color)
+                self._display.show_message(chord_name + ' ' + ('L' if button_data['POSITION'] == 0 else 'H'), x, y + (i % 3) * 9, color)
                 
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
             self._display.show_message(self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 18, color)
             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
             self._display.show_message(self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 9, color)
 
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORD or param == self.PARAM_GUITAR_ROOT:
-            self._display.show_message(self.PARAM_GUITAR_CHORDs[self.value_guitar_chord] + '  ' + ('L' if self.chord_position() == 0 else 'H'), 12, 9, color)
+            self._display.show_message(self.PARAM_GUITAR_CHORDs[self.value_guitar_chord] + '  ' + ('L' if self.chord_position() == 0 else 'H') + ' {:+d}'.format(self.capotasto()), 12, 9, color)
+
             notes = self.chord_notes()
             print('NOTES=', notes)
             for i in list(range(6)):
@@ -1039,25 +1070,30 @@ class Guitar_class:
             self._display.show_message('--GUITAR SETTINGS--', 0, 0, color)
             self._display.show_message('BUTTN: ' + str(self._chord_on_button_number + 1), 0, 9, color)
             
-        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
-            self._display.show_message('INST : ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 54, color)
-            
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
             self._display.show_message('CHORD: ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 18, color)
+            
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
+            self._display.show_message('INST : ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 36, color)
 
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORD or param == self.PARAM_GUITAR_ROOT:
             self._display.show_message(self.PARAM_GUITAR_CHORDs[self.value_guitar_chord] + (' Low' if self.chord_position() == 0 else ' High'), 54, 18, color)
+
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CAPOTASTO:
+            self._display.show_message('CAPO : {:+d}'.format(self.capotasto()), 0, 27, color)
 
         self._display.show()
 
     # Play a string
     def play_a_string(self, string, string_velosity):
         print('PLAY a STRING:', string_velosity)
+        capo = self.capotasto()
+        
         # Notes off (previous chord)
         if self._chord_changed:
             if self._notes_off is not None:
                 for chord_note in self._notes_off:
-                    synth.set_note_off(chord_note, 0)
+                    synth.set_note_off(chord_note + capo, 0)
                     self._notes_off.remove(chord_note)
 ##                    sleep(0.001)
 
@@ -1074,7 +1110,7 @@ class Guitar_class:
             if self._notes_off is not None:
                 off_notes = self._notes_off
                 if chord_note in off_notes:
-                    synth.set_note_off(chord_note, 0)
+                    synth.set_note_off(chord_note + capo, 0)
                     self._notes_off.remove(chord_note)
 ##                    sleep(0.001)
 
@@ -1084,7 +1120,7 @@ class Guitar_class:
                         
             # Note on
             if string_velosity > 0:
-                synth.set_note_on(chord_note, string_velosity, 0)
+                synth.set_note_on(chord_note + capo, string_velosity, 0)
                 if self._notes_off is None:
                     self._notes_off = []
                 self._notes_off.append(chord_note)
@@ -1096,12 +1132,14 @@ class Guitar_class:
     #   string_velosities: [-1,0,127,63,85,-1] ---> String 6=Ignore, 5=Note off, 4=Note on in velosity 127,...
     def play_strings(self, string_velosities):
         print('PLAY STRINGS:', string_velosities)
+        capo = self.capotasto()
+        
         # Notes off (previous chord)
         if self._chord_changed:
             if self._notes_off is not None:
                 off_notes = self._notes_off
                 for chord_note in off_notes:
-                    synth.set_note_off(chord_note, 0)
+                    synth.set_note_off(chord_note + capo, 0)
                     self._notes_off.remove(chord_note)
 ##                    sleep(0.001)
 
@@ -1119,7 +1157,7 @@ class Guitar_class:
                 if self._notes_off is not None:
                     off_notes = self._notes_off
                     for chord_note in off_notes:
-                        synth.set_note_off(chord_note, 0)
+                        synth.set_note_off(chord_note + capo, 0)
                         self._notes_off.remove(chord_note)
 ##                        sleep(0.001)
 
@@ -1128,7 +1166,7 @@ class Guitar_class:
                             
                 # Note on
                 if string_velosities[string] > 0:
-                    synth.set_note_on(chord_note, string_velosities[string], 0)
+                    synth.set_note_on(chord_note + capo, string_velosities[string], 0)
                     if self._notes_off is None:
                         self._notes_off = []
                     self._notes_off.append(chord_note)
@@ -1136,6 +1174,8 @@ class Guitar_class:
 
     def play_chord(self, play=True, velosity=127):
         try:
+            capo = self.capotasto()
+        
             # Play a chord selected
             if play:
                 if self._notes_on is None:
@@ -1145,7 +1185,7 @@ class Guitar_class:
                     print('CHORD NOTEs ON : ', self._notes_on)
                     for nt in self._notes_on:
                         if nt >= 0:
-                            synth.set_note_on(nt, velosity, 0)
+                            synth.set_note_on(nt + capo, velosity, 0)
                             if self._notes_off is None:
                                 self._notes_off = []
                             self._notes_off.append(nt)
@@ -1164,7 +1204,7 @@ class Guitar_class:
                     print('CHORD NOTEs OFF: ', self._notes_off)
                     for nt in self._notes_off:
                         if nt >= 0:
-                            synth.set_note_off(nt, 0)
+                            synth.set_note_off(nt + capo, 0)
 ##                            sleep(0.001)
                         
                     self._notes_on  = None
@@ -1189,63 +1229,41 @@ class Guitar_class:
 
     def do_task(self):
         try:
+            bank = self.chord_bank() * 6
             if input_device.device_info('GUITAR_CHORD1') == False:
                 print('CHORD1')
-                self.set_chord_on_button(0)
+                self.set_chord_on_button(bank)
                 self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
             if input_device.device_info('GUITAR_CHORD2') == False:
                 print('CHORD2')
-                self.set_chord_on_button(1)
+                self.set_chord_on_button(bank + 1)
                 self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
             if input_device.device_info('GUITAR_CHORD3') == False:
                 print('CHORD3')
-                self.set_chord_on_button(2)
+                self.set_chord_on_button(bank + 2)
                 self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
             if input_device.device_info('GUITAR_CHORD4') == False:
                 print('CHORD4')
-                self.set_chord_on_button(3)
+                self.set_chord_on_button(bank + 3)
                 self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
             if input_device.device_info('GUITAR_CHORD5') == False:
                 print('CHORD5')
-                self.set_chord_on_button(4)
+                self.set_chord_on_button(bank + 4)
                 self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
             if input_device.device_info('GUITAR_CHORD6') == False:
                 print('CHORD6')
-                self.set_chord_on_button(5)
+                self.set_chord_on_button(bank + 5)
                 self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
-            if input_device.device_info('GUITAR_CHORD7') == False:
-                print('CHORD7')
-                self.set_chord_on_button(6)
-                self.show_info(self.PARAM_GUITAR_ROOT, 1)
-                
-            # Effector
-#            if input_device.device_info('GUITAR_EFFECTOR') == False:
-#                print('EFFECT ON')
-#                sleep(0.25)
-#                synth.set_pitch_bend( 9000, 0)
-#                sleep(0.25)
-#                synth.set_pitch_bend(12000, 0)
-#                sleep(0.25)
-#                synth.set_pitch_bend(15000, 0)
-#                sleep(0.25)
-#                synth.set_pitch_bend( 8192, 0)
-
-#                self.set_modulation_wheel(1, 127, 0)
-#                sleep(4.0)
-
-#                print('NOTE0 and EFFECT OFF')
-#                self.set_note_off(note, 0)
-#                self.set_pitch_bend(0, 0)
-#                self.set_modulation_wheel(1, 0, 0)
-#                self.set_vibrate(64, 0, 0, 0)
-#                self.set_chorus(0, 0, 0, 0, 0)
-#                sleep(1.0)
+            if input_device.device_info('GUITAR_CHORD_BANK') == False:
+                print('CHORD BANK')
+                self.chord_bank(self.chord_bank() + 1)
+                self.show_info(self.PARAM_GUITAR_CHORDSET, 1)
                 
         except Exception as e:
             led_flush = False
@@ -1256,10 +1274,6 @@ class Guitar_class:
 
             led_flush = False
             print('EXCEPTION: ', e)
-#            display.clear()
-#            display.show()
-#            display.text('EXCEPTION: MIDI-IN', 0, 0, 1)
-#            display.show()
 
     def do_task_settings(self):
         print('GUITAR SETTINGS')
@@ -1295,7 +1309,8 @@ class Guitar_class:
         
             if input_device.device_info('GUITAR_CAPOTASTO') == False:
                 print('GUITAR_CAPOTASTO')
-                self.show_info_settings(self.PARAM_ALL, 1)
+                self.capotasto(self.capotasto() + 1)
+                self.show_info_settings(self.PARAM_GUITAR_CAPOTASTO, 1)
         
             if input_device.device_info('GUITAR_INSTRUMENT') == False:
                 print('GUITAR_INSTRUMENT')
