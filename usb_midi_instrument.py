@@ -38,7 +38,7 @@
 #            Design change of play mode screen.
 #     0.4.2: 01/10/2025
 #            Chord bank is available to extend assigning chords.
-#            Capotasto is available.
+#            Octave change and apotasto are available.
 #########################################################################
 
 import asyncio
@@ -46,7 +46,6 @@ import keypad
 
 from board import *
 import digitalio
-#from busio import UART			# for UART MIDI
 from busio import I2C			# for I2C
 from time import sleep
 import os, re
@@ -64,9 +63,6 @@ import board
 import supervisor
 
 import adafruit_ssd1306			# for SSD1306 OLED Display
-
-#import busio
-#import storage
 
 from analogio import AnalogIn
 
@@ -264,11 +260,6 @@ class ADC_Device_class:
             if self._note_on_ticks[string] >= 0:
                 from_note_on[string] = ticks_diff(current_ticks, self._note_on_ticks[string])
 
-#        print('TICK: ' + str(from_note_on))
-#        display.fill_rect(0, 46, 128, 9, 0)
-#        display.text('TICK:' + str(from_note_on), 0, 46, 1)
-#        display.show()
-
         # Get voltages guitar strings
         for string in list(range(8)):
             voltage = self.get_voltage(string)
@@ -294,9 +285,6 @@ class ADC_Device_class:
                         self._play_chord = False
                         self._note_on_ticks[string] = -1
                         self._adc_on[string] = False
-#                        display.fill_rect(0, 55, 128, 9, 0)
-#                        display.text('CHORD OFF by TIMEOUT', 0, 55, 1)
-#                        display.show()
 
                 elif string <= 6:
                     if self._note_on[string]:
@@ -341,16 +329,6 @@ class ADC_Device_class:
                     self._note_on_ticks[string] = current_ticks
                     chord_note = instrument_guitar.play_a_string(5 - string, velosity)
                     self._adc_on[string] = True
-
-##                    if chord_note < 0:
-##                        self._mute_string = True
-##                        display.fill_rect(0, 55, 128, 9, 0)
-##                        display.text('Mute String: ' + str(5 - string), 0, 55, 1)
-##                        display.show()
-##                    elif self._mute_string:
-##                        self._mute_string = False
-##                        display.fill_rect(0, 55, 128, 9, 0)
-##                        display.show()
                     
                 # Play chord
                 elif string == 7:
@@ -554,10 +532,6 @@ class USB_MIDI_Instrument_class:
                     application.show_message('ON :' + str(midi_msg.note) + '/' + str(midi_msg.velocity), 0, 55, 1)
             elif isinstance(midi_msg, NoteOff):
                 application.show_message('OFF:' + str(midi_msg.note), 0, 55, 1)
-            
-    # MIDI-OUT for keeping compatobolity to UART version
-    def midi_out(self, midi_msg, channel=0):
-        self.midi_send(midi_msg, channel)
 
     # Send note on
     def set_note_on(self, note_key, velocity, channel=0):
@@ -573,12 +547,13 @@ class USB_MIDI_Instrument_class:
         pass
     
     def set_reverb(self, channel, prog, level, feedback):
-        status_byte = 0xB0 + channel
-        midi_msg = bytearray([status_byte, 0x50, prog, status_byte, 0x5B, level])
-        self.midi_out(midi_msg)
-        if feedback > 0:
-            midi_msg = bytearray([0xF0, 0x41, 0x00, 0x42, 0x12, 0x40, 0x01, 0x35, feedback, 0, 0xF7])
-            self.midi_out(midi_msg)
+        pass
+#        status_byte = 0xB0 + channel
+#        midi_msg = bytearray([status_byte, 0x50, prog, status_byte, 0x5B, level])
+#        self.midi_out(midi_msg)
+#        if feedback > 0:
+#            midi_msg = bytearray([0xF0, 0x41, 0x00, 0x42, 0x12, 0x40, 0x01, 0x35, feedback, 0, 0xF7])
+#            self.midi_out(midi_msg)
             
     def set_chorus(self, prog, level, feedback, delay, channel=0):
         if prog is not None:
@@ -598,26 +573,27 @@ class USB_MIDI_Instrument_class:
         if delay is not None:
             self.midi_send(ControlChange(self.ControlChange_Vibrate_Delay, delay, channel=channel), channel)
 
-    # Send pitch bend value
-    def set_pitch_bend(self, value, channel=0):
-        self.midi_send(PitchBend(value, channel=channel), channel)
-
     # Send program change
     def set_program_change(self, program, channel=0):
         if program >= 0 and program <= 127:
             self.midi_send(ProgramChange(program, channel=channel), channel)
 
-    def set_pitch_bend_range(self, channel, value):
-        status_byte = 0xB0 + channel
-        midi_msg = bytearray([status_byte, 0x65, 0x00, 0x64, 0x00, 0x06, value & 0x7f])
-        self.midi_out(midi_msg)
+    # Send pitch bend value
+    def set_pitch_bend(self, value, channel=0):
+        self.midi_send(PitchBend(value, channel=channel), channel)
+
+    def set_pitch_bend_range(self, value, channel=0):
+        self.midi_send(ControlChange(0x65, 0, channel=channel), channel)			# RPN LSB
+        self.midi_send(ControlChange(0x64, 0, channel=channel), channel)			# RPN MSB
+        self.midi_send(ControlChange(0x06, value & 0x7f, channel=channel), channel)	# PRN DATA ENTRY
+
+#        status_byte = 0xB0 + channel
+#        midi_msg = bytearray([status_byte, 0x65, 0x00, 0x64, 0x00, 0x06, value & 0x7f])
+#        self.midi_out(midi_msg)
 
     def set_modulation_wheel(self, modulation, value, channel=0):
-        self.midi_send(ControlChange(modulation, value, channel=channel), channel)
-
-
-    def do_task(self):
         pass
+#        self.midi_send(ControlChange(modulation, value, channel=channel), channel)
 
 ################# End of Unit-MIDI Class Definition #################
 
@@ -629,7 +605,8 @@ class Guitar_class:
     def __init__(self, display_obj):
         self._display = display_obj
 
-        self.PARAM_GUITAR_ROOTs = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+#        self.PARAM_GUITAR_ROOTs = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+        self.PARAM_GUITAR_ROOTs = synth._note_key
         self.PARAM_GUITAR_CHORDs = ['M', 'M7', '7', '6', 'aug', 'm', 'mM7', 'm7', 'm6', 'm7-5', 'add9', 'sus4', '7sus4', 'dim7']
         self.GUITAR_STRINGS_OPEN = [16,11, 7, 2, -3, -8]	# 1st String: E, B, G, D, A, E: 6th String
         self.CHORD_STRUCTURE = {
@@ -821,6 +798,8 @@ class Guitar_class:
         self.PARAM_GUITAR_CHORD = 2
         self.PARAM_GUITAR_CHORDSET = 3
         self.PARAM_GUITAR_CAPOTASTO = 4
+##        self.PARAM_GUITAR_EFFECTOR = 5
+        self.PARAM_GUITAR_OCTAVE = 6
         
         self.value_guitar_root = 0		# Current root
         self.value_guitar_chord = 0		# Current chord
@@ -831,6 +810,7 @@ class Guitar_class:
         self._scale_number = 4			# Normal guitar scale
         self._chord_position = 0		# 0: Low chord, 1: High chord
         self._capotasto = 0				# No capotasto (-12..0..+12)
+        self._pitch_bend_range = 2		# 1 is semitone (0..12)
         self._notes_on  = None
         self._notes_off = None
 
@@ -866,13 +846,14 @@ class Guitar_class:
         input_device.device_alias('GUITAR_ROOT',       'BUTTON_2')
         input_device.device_alias('GUITAR_CHORD',      'BUTTON_3')
         input_device.device_alias('GUITAR_POSITION',   'BUTTON_4')
-        input_device.device_alias('GUITAR_CAPOTASTO',  'BUTTON_5')
-        input_device.device_alias('GUITAR_INSTRUMENT', 'BUTTON_6')
-        input_device.device_alias('GUITAR_EFFECTOR',   'BUTTON_7')
+        input_device.device_alias('GUITAR_OCTAVE',     'BUTTON_5')
+        input_device.device_alias('GUITAR_CAPOTASTO',  'BUTTON_6')
+        input_device.device_alias('GUITAR_INSTRUMENT', 'BUTTON_7')
 
     def setup(self):
         display.fill(0)
-        synth.set_program_change(self.program_number()[1], 0) 
+        synth.set_program_change(self.program_number()[1], 0)
+        synth.set_pitch_bend_range(self.pitch_bend_range(), 0)
         self.show_info(self.PARAM_ALL, 1)
 
     def setup_settings(self):
@@ -935,14 +916,16 @@ class Guitar_class:
             self._chord_on_button[button]['POSITION'] = position % 2
         
         if scale is not None:
-            if scale < -1:
-                scale = 9
-            elif scale > 9:
-                scale = -1
-                
-            self._chord_on_button[button]['SCALE'] = scale
+            self._chord_on_button[button]['SCALE'] = scale % 9
         
         return self._chord_on_button[button]
+
+    def pitch_bend_range(self, bend_range=None):
+        if bend_range is not None:
+            self._pitch_bend_range = bend_range % 13
+            synth.set_pitch_bend_range(self._pitch_bend_range, 0)
+            
+        return self._pitch_bend_range
 
     def chord_bank(self, bank=None):
         if bank is not None:
@@ -966,12 +949,7 @@ class Guitar_class:
 
     def scale_number(self, scale=None):
         if scale is not None:
-            if scale < -1:
-                scale = -1
-            elif scale > 9:
-                scale = 9
-                
-            self._scale_number = scale
+            self._scale_number = scale % 9
             
         return self._scale_number
 
@@ -1069,18 +1047,22 @@ class Guitar_class:
         if param == self.PARAM_ALL:
             self._display.show_message('--GUITAR SETTINGS--', 0, 0, color)
             self._display.show_message('BUTTN: ' + str(self._chord_on_button_number + 1), 0, 9, color)
+            self._display.show_message('P-BND: {:+d}'.format(self.pitch_bend_range()), 0, 54, color)
             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
             self._display.show_message('CHORD: ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 18, color)
-            
-        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
-            self._display.show_message('INST : ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 36, color)
 
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORD or param == self.PARAM_GUITAR_ROOT:
             self._display.show_message(self.PARAM_GUITAR_CHORDs[self.value_guitar_chord] + (' Low' if self.chord_position() == 0 else ' High'), 54, 18, color)
 
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_OCTAVE:
+            self._display.show_message('OCTAV: ' + str(self.scale_number()), 0, 27, color)
+
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CAPOTASTO:
-            self._display.show_message('CAPO : {:+d}'.format(self.capotasto()), 0, 27, color)
+            self._display.show_message('CAPO : {:+d}'.format(self.capotasto()), 0, 36, color)
+            
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
+            self._display.show_message('INST : ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 45, color)
 
         self._display.show()
 
@@ -1307,6 +1289,12 @@ class Guitar_class:
                 self.set_chord_on_button(current_button)
                 self.show_info_settings(self.PARAM_ALL, 1)
         
+            if input_device.device_info('GUITAR_OCTAVE') == False:
+                print('GUITAR_OCTAVE')
+                self.chord_on_button(current_button, None, None, None, button_data['SCALE'] + 1)
+                self.set_chord_on_button(current_button)
+                self.show_info_settings(self.PARAM_ALL, 1)
+        
             if input_device.device_info('GUITAR_CAPOTASTO') == False:
                 print('GUITAR_CAPOTASTO')
                 self.capotasto(self.capotasto() + 1)
@@ -1318,10 +1306,11 @@ class Guitar_class:
                 synth.set_program_change(self.program_number()[1], 0) 
                 self.show_info_settings(self.PARAM_ALL, 1)
         
-            if input_device.device_info('GUITAR_EFFECTOR') == False:
-                print('GUITAR_EFFECTOR')
-                self.show_info_settings(self.PARAM_ALL, 1)
-                
+##            if input_device.device_info('GUITAR_EFFECTOR') == False:
+##                print('GUITAR_EFFECTOR')
+##                self.pitch_bend_range(self.pitch_bend_range() + 1)
+##                self.show_info_settings(self.PARAM_GUITAR_EFFECTOR, 1)
+
         except Exception as e:
             led_flush = False
             for cnt in list(range(5)):
