@@ -39,6 +39,8 @@
 #     0.4.2: 01/10/2025
 #            Chord bank is available to extend assigning chords.
 #            Octave change and apotasto are available.
+#     0.4.3: 01/10/2025
+#            Note on/off debugging.
 #########################################################################
 
 import asyncio
@@ -103,14 +105,14 @@ async def catch_adc_voltage(adc):
         await asyncio.sleep(0.01)
 
 
-led_status = True
-async def led_flush():
-    global led_status, adc0
-    while True:
-        led_status = not led_status
-        pico_led.value = led_status
-
-        await asyncio.sleep(1.0)
+#led_status = True
+#async def led_flush():
+#    global led_status, adc0
+#    while True:
+#        led_status = not led_status
+#        pico_led.value = led_status
+#
+#        await asyncio.sleep(1.0)
 
 
 ########################
@@ -210,10 +212,8 @@ class ADC_Device_class:
         self._note_on = [False] * 7				# 6 strings on guitar, and effector
         self._note_on_ticks = [-1] * 8			# 8 pads on UI (Piezo elements)
         self._play_chord = False
-        self._voltage_gate = [(100.0,70.0)] * 8
+        self._voltage_gate = [(100.0,20.0)] * 8
         self._adc_on = [False] * 8
-
-        self._mute_string = False
 
     def adc(self):
         return self._adc
@@ -271,7 +271,6 @@ class ADC_Device_class:
 
             # Note on time out
             if from_note_on[string] >= 3000:
-##            if from_note_on[string] == -99999:
                 if string <= 5:
                     if self._note_on[string]:
                         self._note_on[string] = False
@@ -295,9 +294,26 @@ class ADC_Device_class:
                         print('PITCH BEND off')
 
             # Pad is released
-            if voltage <= self._voltage_gate[string][1]:
-                 self._adc_on[string] = False
+            elif voltage <= self._voltage_gate[string][1]:
+                if string <= 5:
+                        self._note_on[string] = False
+                        self._note_on_ticks[string] = -1
+                        self._adc_on[string] = False
+                    
+                elif string == 7:
+                    if self._play_chord:
+                        self._play_chord = False
+                        self._note_on_ticks[string] = -1
+                        self._adc_on[string] = False
 
+                elif string <= 6:
+                    if self._note_on[string]:
+                        self._note_on[string] = False
+                        self._note_on_ticks[string] = -1
+                        synth.set_pitch_bend( 8192, 0)
+                        self._adc_on[string] = False                    
+                        print('PITCH BEND off')
+                        
             # Pad is tapped
             elif voltage >= self._voltage_gate[string][0] and self._adc_on[string] == False:
                 # Velosity
@@ -334,7 +350,7 @@ class ADC_Device_class:
                 elif string == 7:
                     if self._play_chord:
                         print('PLAY CHORD OFF')
-                        instrument_guitar.play_chord(False)
+###                        instrument_guitar.play_chord(False)
                         self._play_chord = False
                         self._note_on_ticks[string] = -1
                         self._adc_on[string] = False
@@ -351,11 +367,6 @@ class ADC_Device_class:
                     self._play_chord = True
                     self._note_on_ticks[string] = current_ticks
                     self._adc_on[string] = True
-
-                    if self._mute_string:
-                        self._mute_string = False
-                        display.fill_rect(0, 55, 128, 9, 0)
-                        display.show()
                     
                 # Pad 6
                 elif string == 6:
@@ -482,12 +493,7 @@ class USB_MIDI_Instrument_class:
 
         except Exception as e:
             application.show_message('GM LIST:' + e)
-            for cnt in list(range(5)):
-                pico_led.value = False
-                sleep(0.25)
-                pico_led.value = True
-                sleep(0.5)
-
+            sleep(5.0)
             display.clear()
             application.show_info()
 
@@ -504,24 +510,27 @@ class USB_MIDI_Instrument_class:
 
     # MIDI sends to USB as a USB device
     def midi_send(self, midi_msg, channel=0):
+        channel = channel % 16
+#        print('INSTANCE:', isinstance(midi_msg, NoteOn), isinstance(midi_msg, NoteOff), self._send_note_on[channel])
         if isinstance(midi_msg, NoteOn):
             if midi_msg.note in self._send_note_on[channel]:
-                self.set_note_off(midi_msg.note, channel)
-                print('NOTE OFF:' + str(midi_msg.note))
-                return
+                self._usb_midi[channel].send(NoteOff(midi_msg.note, channel=channel))
 
-            self._send_note_on[channel].append(midi_msg.note)
-            print('SEND NOTE ON :' + str(midi_msg.note) + ' ONS=' + str(self._send_note_on[channel]))
+            else:
+                self._send_note_on[channel].append(midi_msg.note)
+
+            pico_led.value = True
+#            print('SEND NOTE ON :' + str(midi_msg.note) + ' ONS=' + str(self._send_note_on[channel]))
             
         elif isinstance(midi_msg, NoteOff):
+            print('GET NOTE OFF:' + str(midi_msg.note))
             if midi_msg.note in self._send_note_on[channel]:
                 self._send_note_on[channel].remove(midi_msg.note)
-                print('SEND NOTE OFF:' + str(midi_msg.note) + ' ONS=' + str(self._send_note_on[channel]))
-            else:
-                return
+                pico_led.value = False
+#                print('SEND NOTE OFF:' + str(midi_msg.note) + ' ONS=' + str(self._send_note_on[channel]))
             
 #        print('SEND:', channel, midi_msg)
-        self._usb_midi[channel % 16].send(midi_msg)
+        self._usb_midi[channel].send(midi_msg)
 #        print('SENT')
 
         if application._DEBUG_MODE:
@@ -605,7 +614,6 @@ class Guitar_class:
     def __init__(self, display_obj):
         self._display = display_obj
 
-#        self.PARAM_GUITAR_ROOTs = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
         self.PARAM_GUITAR_ROOTs = synth._note_key
         self.PARAM_GUITAR_CHORDs = ['M', 'M7', '7', '6', 'aug', 'm', 'mM7', 'm7', 'm6', 'm7-5', 'add9', 'sus4', '7sus4', 'dim7']
         self.GUITAR_STRINGS_OPEN = [16,11, 7, 2, -3, -8]	# 1st String: E, B, G, D, A, E: 6th String
@@ -803,7 +811,6 @@ class Guitar_class:
         
         self.value_guitar_root = 0		# Current root
         self.value_guitar_chord = 0		# Current chord
-        self._chord_changed = False
         
         self._programs = [-1, 24, 25, 26, 27, 28, 29, 30, 31, 104, 105, 106, 107]	# Instrument number in GM
         self._program_number = 0  		# Steel Guitar
@@ -811,8 +818,6 @@ class Guitar_class:
         self._chord_position = 0		# 0: Low chord, 1: High chord
         self._capotasto = 0				# No capotasto (-12..0..+12)
         self._pitch_bend_range = 2		# 1 is semitone (0..12)
-        self._notes_on  = None
-        self._notes_off = None
 
         # Chord on button
         self._chord_bank = 0
@@ -939,7 +944,6 @@ class Guitar_class:
         self.value_guitar_chord = button_data['CHORD']		# Current chord
         self._chord_position = button_data['POSITION']		# 0: Low chord, 1: High chord
         self._scale_number = button_data['SCALE']
-        self._chord_changed = False
 
     def guitar_string_note(self, strings, frets):
         if frets < 0:
@@ -994,7 +998,6 @@ class Guitar_class:
         for strings in list(range(6)):
             note = self.guitar_string_note(strings, fret_map[strings])
             if note is not None:
-#                notes.append(note + root)
                 notes.append(note + (self._scale_number + 1) * 12)
             else:
                 notes.append(-1)
@@ -1070,143 +1073,42 @@ class Guitar_class:
     def play_a_string(self, string, string_velosity):
         print('PLAY a STRING:', string_velosity)
         capo = self.capotasto()
-        
-        # Notes off (previous chord)
-        if self._chord_changed:
-            if self._notes_off is not None:
-                for chord_note in self._notes_off:
-                    synth.set_note_off(chord_note + capo, 0)
-                    self._notes_off.remove(chord_note)
-##                    sleep(0.001)
-
-                if len(self._notes_off) == 0:
-                    self._notes_off = None
-                        
-            self._chord_changed = False
 
         # Play strings in the current chord
         string_notes = self.chord_notes()
         chord_note = string_notes[string]
         if chord_note >= 0:
-            # Note off
-            if self._notes_off is not None:
-                off_notes = self._notes_off
-                if chord_note in off_notes:
-                    synth.set_note_off(chord_note + capo, 0)
-                    self._notes_off.remove(chord_note)
-##                    sleep(0.001)
-
-
-                if len(self._notes_off) == 0:
-                    self._notes_off = None
-                        
             # Note on
             if string_velosity > 0:
                 synth.set_note_on(chord_note + capo, string_velosity, 0)
-                if self._notes_off is None:
-                    self._notes_off = []
-                self._notes_off.append(chord_note)
-##                sleep(0.001)
+
+            # Note off
+            else:
+                synth.set_note_off(chord_note + capo, 0)
 
         return chord_note
-
-    # Play strings with each velocities
-    #   string_velosities: [-1,0,127,63,85,-1] ---> String 6=Ignore, 5=Note off, 4=Note on in velosity 127,...
-    def play_strings(self, string_velosities):
-        print('PLAY STRINGS:', string_velosities)
-        capo = self.capotasto()
-        
-        # Notes off (previous chord)
-        if self._chord_changed:
-            if self._notes_off is not None:
-                off_notes = self._notes_off
-                for chord_note in off_notes:
-                    synth.set_note_off(chord_note + capo, 0)
-                    self._notes_off.remove(chord_note)
-##                    sleep(0.001)
-
-                if len(self._notes_off) == 0:
-                    self._notes_off = None
-                        
-            self._chord_changed = False
-
-        # Play strings in the current chord
-        string_notes = self.chord_notes()
-        for string in list(range(6)):
-            chord_note = string_notes[string]
-            if chord_note >= 0:
-                # Note off
-                if self._notes_off is not None:
-                    off_notes = self._notes_off
-                    for chord_note in off_notes:
-                        synth.set_note_off(chord_note + capo, 0)
-                        self._notes_off.remove(chord_note)
-##                        sleep(0.001)
-
-                    if len(self._notes_off) == 0:
-                        self._notes_off = None
-                            
-                # Note on
-                if string_velosities[string] > 0:
-                    synth.set_note_on(chord_note + capo, string_velosities[string], 0)
-                    if self._notes_off is None:
-                        self._notes_off = []
-                    self._notes_off.append(chord_note)
-##                    sleep(0.001)
 
     def play_chord(self, play=True, velosity=127):
         try:
             capo = self.capotasto()
-        
+            notes_in_chord = self.chord_notes()        
+
             # Play a chord selected
             if play:
-                if self._notes_on is None:
-                    pico_led.value = True                    
-                    self._notes_on = self.chord_notes()
-                    
-                    print('CHORD NOTEs ON : ', self._notes_on)
-                    for nt in self._notes_on:
-                        if nt >= 0:
-                            synth.set_note_on(nt + capo, velosity, 0)
-                            if self._notes_off is None:
-                                self._notes_off = []
-                            self._notes_off.append(nt)
-##                            sleep(0.001)
-
-                    pico_led.value = False
-                
-##                else:
-##                    sleep(0.006)
+                print('CHORD NOTEs ON : ', notes_in_chord)
+                for nt in notes_in_chord:
+                    if nt >= 0:
+                        synth.set_note_on(nt + capo, velosity, 0)
 
             # Notes in chord off
             else:
                 # Notes off
-                if self._notes_off is not None:
-                    pico_led.value = True                    
-                    print('CHORD NOTEs OFF: ', self._notes_off)
-                    for nt in self._notes_off:
-                        if nt >= 0:
-                            synth.set_note_off(nt + capo, 0)
-##                            sleep(0.001)
-                        
-                    self._notes_on  = None
-                    self._notes_off = None
-                    self._chord_changed = False
-                    pico_led.value  = False                    
-
-##                else:
-##                    sleep(0.006)
-
-                self._chord_changed = False
+                print('CHORD NOTEs OFF: ', notes_in_chord)
+                for nt in notes_in_chord:
+                    if nt >= 0:
+                        synth.set_note_off(nt + capo, 0)
 
         except Exception as e:
-            led_flush = False
-            for cnt in list(range(5)):
-                pico_led.value = led_flush
-                led_flush = not led_flush
-                sleep(0.5)
-
-            led_flush = False
             print('EXCEPTION: ', e)
 
     def do_task(self):
@@ -1248,13 +1150,6 @@ class Guitar_class:
                 self.show_info(self.PARAM_GUITAR_CHORDSET, 1)
                 
         except Exception as e:
-            led_flush = False
-            for cnt in list(range(5)):
-                pico_led.value = led_flush
-                led_flush = not led_flush
-                sleep(0.5)
-
-            led_flush = False
             print('EXCEPTION: ', e)
 
     def do_task_settings(self):
@@ -1312,13 +1207,6 @@ class Guitar_class:
 ##                self.show_info_settings(self.PARAM_GUITAR_EFFECTOR, 1)
 
         except Exception as e:
-            led_flush = False
-            for cnt in list(range(5)):
-                pico_led.value = led_flush
-                led_flush = not led_flush
-                sleep(0.5)
-
-            led_flush = False
             print('EXCEPTION: ', e)
         
 ################# End of Guitar Class Definition #################
@@ -1413,7 +1301,6 @@ def setup():
 #    pico_led = digitalio.DigitalInOut(GP25)
     pico_led = digitalio.DigitalInOut(LED)
     pico_led.direction = digitalio.Direction.OUTPUT
-    pico_led.value = True
 
     # OLED SSD1306
     print('setup')
@@ -1470,8 +1357,9 @@ async def main():
     interrupt_task8 = asyncio.create_task(catch_pin_transitions(board.GP5,  'BUTTON_8', input_device.button_pressed, input_device.button_released))
 
     interrupt_adc0  = asyncio.create_task(catch_adc_voltage(adc0))
-    interrupt_led   = asyncio.create_task(led_flush())
-    await asyncio.gather(interrupt_task1, interrupt_task2, interrupt_task3, interrupt_task4, interrupt_adc0, interrupt_led)
+#    interrupt_led   = asyncio.create_task(led_flush())
+#    await asyncio.gather(interrupt_task1, interrupt_task2, interrupt_task3, interrupt_task4, interrupt_adc0, interrupt_led)
+    await asyncio.gather(interrupt_task1, interrupt_task2, interrupt_task3, interrupt_task4, interrupt_adc0)
 
 ######### MAIN ##########
 if __name__=='__main__':
