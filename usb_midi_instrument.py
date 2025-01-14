@@ -1116,26 +1116,26 @@ class Guitar_class:
             # Play a chord selected
             if play:
                 print('CHORD NOTEs ON : ', notes_in_chord)
-                last_nt = -1
+                count_nt = 0
                 for nt in notes_in_chord:
                     if nt >= 0:
                         synth.set_note_on(nt + capo, velosity, channel)
-                        last_nt = nt + capo
+                        count_nt = count_nt + 1
 
-                if last_nt >= 0:												# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+                if count_nt % 2 == 1:											# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
                     synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
             # Notes in chord off
             else:
                 # Notes off
                 print('CHORD NOTEs OFF: ', notes_in_chord)
-                last_nt = -1
+                count_nt = 0
                 for nt in notes_in_chord:
                     if nt >= 0:
                         synth.set_note_off(nt + capo, 0)
-                        last_nt = nt + capo
+                        count_nt = count_nt + 1
 
-                if last_nt >= 0:												# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+                if count_nt % 2 == 1:											# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
                     synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
         except Exception as e:
