@@ -41,6 +41,9 @@
 #            Octave change and apotasto are available.
 #     0.4.3: 01/10/2025
 #            Note on/off debugging.
+#     0.5.0: 01/13/2025
+#            Use another piezo element (Change velosity contrtol.)
+#            Fixed the note on problem preliminary.
 #########################################################################
 
 import asyncio
@@ -67,6 +70,7 @@ import supervisor
 import adafruit_ssd1306			# for SSD1306 OLED Display
 
 from analogio import AnalogIn
+import math
 
 
 ###############################################
@@ -212,7 +216,8 @@ class ADC_Device_class:
         self._note_on = [False] * 7				# 6 strings on guitar, and effector
         self._note_on_ticks = [-1] * 8			# 8 pads on UI (Piezo elements)
         self._play_chord = False
-        self._voltage_gate = [(100.0,20.0)] * 8
+#        self._voltage_gate = [(100.0,20.0)] * 8	 # for Piezo elements
+        self._voltage_gate = [(400.0,200.0)] * 8		# for Resistor elements
         self._adc_on = [False] * 8
 
     def adc(self):
@@ -226,8 +231,7 @@ class ADC_Device_class:
         self._4051_selectors[1].value = (analog_channel & 0x2) >> 1
         self._4051_selectors[2].value = (analog_channel & 0x4) >> 2
 #        sleep(0.01)
-        voltage = self._adc.value * 3.3 / 65535
-#        sleep(0.01)
+        voltage = self._adc.value * 5.0 / 65535
         return voltage
 
     def adc_handler(self):
@@ -263,21 +267,20 @@ class ADC_Device_class:
         # Get voltages guitar strings
         for string in list(range(8)):
             voltage = self.get_voltage(string)
-#            print('STR ' + str(string) + ' / VOL=', voltage)
-            voltage = voltage * 1000.0
-            
-#            if string >= 6:
-#                print('STRING ' + str(string) + ': ' + str(voltage))
+            voltage = math.pow(2, voltage) / 32.0 * 5000.0
 
             # Note on time out
             if from_note_on[string] >= 3000:
+                print('AUTO NOTE OFF:', string, from_note_on[string])
+                # Note a string off
                 if string <= 5:
                     if self._note_on[string]:
                         self._note_on[string] = False
                         self._note_on_ticks[string] = -1
                         instrument_guitar.play_a_string(5 - string, 0)
                         self._adc_on[string] = False
-                    
+                
+                # Note a chord off
                 elif string == 7:
                     if self._play_chord:
                         instrument_guitar.play_chord(False)
@@ -285,7 +288,8 @@ class ADC_Device_class:
                         self._note_on_ticks[string] = -1
                         self._adc_on[string] = False
 
-                elif string <= 6:
+                # Finish pitch bend
+                elif string == 6:
                     if self._note_on[string]:
                         self._note_on[string] = False
                         self._note_on_ticks[string] = -1
@@ -295,18 +299,25 @@ class ADC_Device_class:
 
             # Pad is released
             elif voltage <= self._voltage_gate[string][1]:
+#                print('PAD RELEASED:', string, voltage)
+                #Note a string off
                 if string <= 5:
+                    if self._note_on[string]:
                         self._note_on[string] = False
                         self._note_on_ticks[string] = -1
                         self._adc_on[string] = False
-                    
+###                        instrument_guitar.play_a_string(5 - string, 0)
+                
+                # Note a chord off
                 elif string == 7:
                     if self._play_chord:
                         self._play_chord = False
                         self._note_on_ticks[string] = -1
                         self._adc_on[string] = False
+###                        instrument_guitar.play_chord(False)
 
-                elif string <= 6:
+                # Finish pitch bend
+                elif string == 6:
                     if self._note_on[string]:
                         self._note_on[string] = False
                         self._note_on_ticks[string] = -1
@@ -316,12 +327,15 @@ class ADC_Device_class:
                         
             # Pad is tapped
             elif voltage >= self._voltage_gate[string][0] and self._adc_on[string] == False:
+                pass_voltage = self._voltage_gate[string][0]
+                print('PAD PRESSED:', string, voltage)
                 # Velosity
-                velosity = int(voltage / 3.5)
+                velosity = int((voltage - pass_voltage) * 128.0 * 2.0 / (5000.0 - pass_voltage)) + 64
+#                velosity = int(math.log(voltage, 10) / 3.7 * 100) + 27
                 if velosity > 127:
                     velosity = 127
                 
-                velosity = velosity_curve(velosity)
+#                velosity = velosity_curve(velosity)
                 
                 # Play a string
                 if string <= 5:
@@ -340,7 +354,7 @@ class ADC_Device_class:
                         synth.set_pitch_bend( 8192, 0)
                         self._adc_on[6] = False                    
 
-                    print('PLAY a STRING:', 5 - string)
+                    print('PLAY a STRING:', 5 - string, voltage, velosity)
                     self._note_on[string] = True
                     self._note_on_ticks[string] = current_ticks
                     chord_note = instrument_guitar.play_a_string(5 - string, velosity)
@@ -362,7 +376,7 @@ class ADC_Device_class:
                         synth.set_pitch_bend( 8192, 0)
                         self._adc_on[6] = False                    
                         
-                    print('PLAY CHORD')
+                    print('PLAY CHORD:', voltage, velosity)
                     instrument_guitar.play_chord(True, velosity)
                     self._play_chord = True
                     self._note_on_ticks[string] = current_ticks
@@ -380,7 +394,7 @@ class ADC_Device_class:
                         print('PITCH BEND OFF')
 
                     bend_velosity = 9000 + int((7000 / 127) * velosity)
-                    print('PITCH BEND ON:', bend_velosity)
+                    print('PITCH BEND ON:', bend_velosity, voltage, velosity)
                     synth.set_pitch_bend(bend_velosity, 0)
                     self._note_on[string] = True
                     self._note_on_ticks[string] = current_ticks
@@ -511,28 +525,29 @@ class USB_MIDI_Instrument_class:
     # MIDI sends to USB as a USB device
     def midi_send(self, midi_msg, channel=0):
         channel = channel % 16
+        print('MIDI SEND:', midi_msg)
 #        print('INSTANCE:', isinstance(midi_msg, NoteOn), isinstance(midi_msg, NoteOff), self._send_note_on[channel])
         if isinstance(midi_msg, NoteOn):
             if midi_msg.note in self._send_note_on[channel]:
                 self._usb_midi[channel].send(NoteOff(midi_msg.note, channel=channel))
+#                print('MIDI NOTE OFF:', midi_msg.note)
 
             else:
                 self._send_note_on[channel].append(midi_msg.note)
-
+                
             pico_led.value = True
-#            print('SEND NOTE ON :' + str(midi_msg.note) + ' ONS=' + str(self._send_note_on[channel]))
-            
+
         elif isinstance(midi_msg, NoteOff):
-            print('GET NOTE OFF:' + str(midi_msg.note))
+#            print('GET NOTE OFF:' + str(midi_msg.note))
             if midi_msg.note in self._send_note_on[channel]:
                 self._send_note_on[channel].remove(midi_msg.note)
-                pico_led.value = False
-#                print('SEND NOTE OFF:' + str(midi_msg.note) + ' ONS=' + str(self._send_note_on[channel]))
-            
-#        print('SEND:', channel, midi_msg)
-        self._usb_midi[channel].send(midi_msg)
-#        print('SENT')
 
+            pico_led.value = False
+
+        # Send a MIDI message
+        self._usb_midi[channel].send(midi_msg)
+
+        # DEBUG
         if application._DEBUG_MODE:
             if isinstance(midi_msg, NoteOn):
                 if midi_msg.velocity == 0:
@@ -586,15 +601,19 @@ class USB_MIDI_Instrument_class:
     def set_program_change(self, program, channel=0):
         if program >= 0 and program <= 127:
             self.midi_send(ProgramChange(program, channel=channel), channel)
+###            synth._usb_midi[channel].send(NoteOff(0, channel=channel))		# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
     # Send pitch bend value
     def set_pitch_bend(self, value, channel=0):
         self.midi_send(PitchBend(value, channel=channel), channel)
+###        synth._usb_midi[channel].send(NoteOff(0, channel=channel))		# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
+    # Send pitch bend range value
     def set_pitch_bend_range(self, value, channel=0):
         self.midi_send(ControlChange(0x65, 0, channel=channel), channel)			# RPN LSB
         self.midi_send(ControlChange(0x64, 0, channel=channel), channel)			# RPN MSB
         self.midi_send(ControlChange(0x06, value & 0x7f, channel=channel), channel)	# PRN DATA ENTRY
+###        synth._usb_midi[channel].send(NoteOff(0, channel=channel))		# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
 #        status_byte = 0xB0 + channel
 #        midi_msg = bytearray([status_byte, 0x65, 0x00, 0x64, 0x00, 0x06, value & 0x7f])
@@ -981,10 +1000,10 @@ class Guitar_class:
             chord = self.value_guitar_chord
             chord = chord % 14							# SOS DEBUG
         
-        print('root, chord=', root, chord)
+#        print('root, chord=', root, chord)
         root_name = self.PARAM_GUITAR_ROOTs[root % 12]
         chord_name = root_name + self.PARAM_GUITAR_CHORDs[chord]
-        print('CHORD NAME: ', chord_name, self.CHORD_STRUCTURE[chord_name][chord_position])
+#        print('CHORD NAME: ', chord_name, self.CHORD_STRUCTURE[chord_name][chord_position])
         return (root_name, chord_name)
 
     def chord_notes(self, chord_position=None, root=None, chord=None, scale=None):
@@ -993,7 +1012,7 @@ class Guitar_class:
             
         (root_name, chord_name) = self.chord_name(chord_position, root, chord, scale)
         notes = []
-        print('CHORD NAME: ', chord_name, self.CHORD_STRUCTURE[chord_name][chord_position])
+#        print('CHORD NAME: ', chord_name, self.CHORD_STRUCTURE[chord_name][chord_position])
         fret_map = self.CHORD_STRUCTURE[chord_name][chord_position]
         for strings in list(range(6)):
             note = self.guitar_string_note(strings, fret_map[strings])
@@ -1070,8 +1089,8 @@ class Guitar_class:
         self._display.show()
 
     # Play a string
-    def play_a_string(self, string, string_velosity):
-        print('PLAY a STRING:', string_velosity)
+    def play_a_string(self, string, string_velosity, channel=0):
+#        print('PLAY a STRING VELO:', string_velosity)
         capo = self.capotasto()
 
         # Play strings in the current chord
@@ -1080,15 +1099,15 @@ class Guitar_class:
         if chord_note >= 0:
             # Note on
             if string_velosity > 0:
-                synth.set_note_on(chord_note + capo, string_velosity, 0)
-
+                synth.set_note_on(chord_note + capo, string_velosity, channel)
+                synth._usb_midi[channel].send(NoteOff(0, channel=channel))		# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
             # Note off
             else:
                 synth.set_note_off(chord_note + capo, 0)
 
         return chord_note
 
-    def play_chord(self, play=True, velosity=127):
+    def play_chord(self, play=True, velosity=127, channel=0):
         try:
             capo = self.capotasto()
             notes_in_chord = self.chord_notes()        
@@ -1096,9 +1115,14 @@ class Guitar_class:
             # Play a chord selected
             if play:
                 print('CHORD NOTEs ON : ', notes_in_chord)
+                last_nt = -1
                 for nt in notes_in_chord:
                     if nt >= 0:
-                        synth.set_note_on(nt + capo, velosity, 0)
+                        synth.set_note_on(nt + capo, velosity, channel)
+                        last_nt = nt + capo
+
+                if last_nt >= 0:												# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+                    synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
             # Notes in chord off
             else:
