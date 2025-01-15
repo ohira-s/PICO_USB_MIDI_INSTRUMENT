@@ -42,8 +42,11 @@
 #     0.4.3: 01/10/2025
 #            Note on/off debugging.
 #     0.5.0: 01/13/2025
-#            Use another piezo element (Change velosity contrtol.)
+#            Use another piezo element (Change velocity contrtol.)
 #            Fixed the note on problem preliminary.
+#     0.5.1: 01/15/2025
+#            Configuration screen: Offset velocity, Pitch bend range,
+#                                  Velocity curve.
 #########################################################################
 
 import asyncio
@@ -94,7 +97,7 @@ async def catch_pin_transitions(pin, pin_name, callback_pressed=None, callback_r
 
             # Gives away process time to the other tasks.
             # If there is no task, let give back process time to me.
-            await asyncio.sleep(0.1)
+            await asyncio.sleep(0.05)
 
 
 ##########################################
@@ -106,7 +109,8 @@ async def catch_adc_voltage(adc):
 
         # Gives away process time to the other tasks.
         # If there is no task, let give back process time to me.
-        await asyncio.sleep(0.01)
+#        await asyncio.sleep(0.01)
+        await asyncio.sleep(0.0)
 
 
 #led_status = True
@@ -219,12 +223,25 @@ class ADC_Device_class:
 #        self._voltage_gate = [(100.0,20.0)] * 8	 # for Piezo elements
         self._voltage_gate = [(400.0,200.0)] * 8		# for Resistor elements
         self._adc_on = [False] * 8
+        
+        self._velocity_curve = 2.4
 
     def adc(self):
         return self._adc
 
     def adc_name(self):
         return self._adc_name
+
+    def velocity_curve(self, curve=None):
+        if curve is not None:
+            if curve < 1.5:
+                curve = 1.5
+            elif curve > 4.0:
+                curve = 1.5
+                
+            self._velocity_curve = curve
+
+        return self._velocity_curve
 
     def get_voltage(self, analog_channel):
         self._4051_selectors[0].value =  analog_channel & 0x1
@@ -235,29 +252,6 @@ class ADC_Device_class:
         return voltage
 
     def adc_handler(self):
-        def velosity_curve(velosity):
-            if velosity < 32:
-                a = 4
-                b = 20
-            elif velosity < 64:
-                a = 3
-                b = 51
-            elif velosity < 86:
-                a = 2
-                b = 144
-            else:
-                a = 1
-                b = 248
-                
-            v = a * velosity + b
-#            v = int((v - 20) * 107 / 355) + 20
-            v = int((v - 20) * 107 / 355 / 1.5) + 60
-            if v > 127:
-                v = 127
-                
-            return v
-
-        ###--- Main: adc_handler ---###
         current_ticks = supervisor.ticks_ms()
         from_note_on = [-1] * 8
         for string in list(range(8)):
@@ -265,9 +259,13 @@ class ADC_Device_class:
                 from_note_on[string] = ticks_diff(current_ticks, self._note_on_ticks[string])
 
         # Get voltages guitar strings
+        velo_curve = self.velocity_curve()
+        velo_factor = math.pow(velo_curve, 5)
         for string in list(range(8)):
             voltage = self.get_voltage(string)
-            voltage = math.pow(2, voltage) / 32.0 * 5000.0
+            voltage = (math.pow(velo_curve, voltage) - 1) / velo_factor * 10000.0
+            if voltage > 5000.0:
+                voltage = 5000.0
 
             # Note on time out
             if from_note_on[string] >= 3000:
@@ -329,13 +327,10 @@ class ADC_Device_class:
             elif voltage >= self._voltage_gate[string][0] and self._adc_on[string] == False:
                 pass_voltage = self._voltage_gate[string][0]
                 print('PAD PRESSED:', string, voltage)
-                # Velosity
-                velosity = int((voltage - pass_voltage) * 128.0 * 2.0 / (5000.0 - pass_voltage)) + 64
-#                velosity = int(math.log(voltage, 10) / 3.7 * 100) + 27
-                if velosity > 127:
-                    velosity = 127
-                
-#                velosity = velosity_curve(velosity)
+                # velocity
+                velocity = int((voltage - pass_voltage) * 128.0 * 3.0 / (5000.0 - pass_voltage)) + 30
+                if velocity > 127:
+                    velocity = 127
                 
                 # Play a string
                 if string <= 5:
@@ -354,10 +349,10 @@ class ADC_Device_class:
                         synth.set_pitch_bend( 8192, 0)
                         self._adc_on[6] = False                    
 
-                    print('PLAY a STRING:', 5 - string, voltage, velosity)
+                    print('PLAY a STRING:', 5 - string, voltage, velocity)
                     self._note_on[string] = True
                     self._note_on_ticks[string] = current_ticks
-                    chord_note = instrument_guitar.play_a_string(5 - string, velosity)
+                    chord_note = instrument_guitar.play_a_string(5 - string, velocity)
                     self._adc_on[string] = True
                     
                 # Play chord
@@ -376,8 +371,8 @@ class ADC_Device_class:
                         synth.set_pitch_bend( 8192, 0)
                         self._adc_on[6] = False                    
                         
-                    print('PLAY CHORD:', voltage, velosity)
-                    instrument_guitar.play_chord(True, velosity)
+                    print('PLAY CHORD:', voltage, velocity)
+                    instrument_guitar.play_chord(True, velocity)
                     self._play_chord = True
                     self._note_on_ticks[string] = current_ticks
                     self._adc_on[string] = True
@@ -393,9 +388,9 @@ class ADC_Device_class:
                         self._adc_on[string] = False                    
                         print('PITCH BEND OFF')
 
-                    bend_velosity = 9000 + int((7000 / 127) * velosity)
-                    print('PITCH BEND ON:', bend_velosity, voltage, velosity)
-                    synth.set_pitch_bend(bend_velosity, 0)
+                    bend_velocity = 9000 + int((7000 / 127) * velocity)
+                    print('PITCH BEND ON:', bend_velocity, voltage, velocity)
+                    synth.set_pitch_bend(bend_velocity, 0)
                     self._note_on[string] = True
                     self._note_on_ticks[string] = current_ticks
                     self._adc_on[string] = True
@@ -837,6 +832,7 @@ class Guitar_class:
         self._chord_position = 0		# 0: Low chord, 1: High chord
         self._capotasto = 0				# No capotasto (-12..0..+12)
         self._pitch_bend_range = 2		# 1 is semitone (0..12)
+        self._offset_velocity = 0		# Note on velocity offset (0,10,20,...,100)
 
         # Chord on button
         self._chord_bank = 0
@@ -874,6 +870,11 @@ class Guitar_class:
         input_device.device_alias('GUITAR_CAPOTASTO',  'BUTTON_6')
         input_device.device_alias('GUITAR_INSTRUMENT', 'BUTTON_7')
 
+        # Device aliases for settings mode
+        input_device.device_alias('GUITAR_BASE_VOLUME',      'BUTTON_1')
+        input_device.device_alias('GUITAR_VELOCITY_CURVE',   'BUTTON_2')
+        input_device.device_alias('GUITAR_PITCH_BEND_RANGE', 'BUTTON_3')
+
     def setup(self):
         display.fill(0)
         synth.set_program_change(self.program_number()[1], 0)
@@ -887,6 +888,10 @@ class Guitar_class:
         synth.set_program_change(self.program_number()[1], 0) 
         self.show_info_settings(self.PARAM_ALL, 1)
 
+    def setup_configs(self):
+        display.fill(0)
+        self.show_info_configs(self.PARAM_ALL, 1)
+
     def capotasto(self, capo=None):
         if capo is not None:
             if capo < -12:
@@ -897,6 +902,12 @@ class Guitar_class:
             self._capotasto = capo
             
         return self._capotasto
+
+    def offset_velocity(self, offset=None):
+        if offset is not None:
+            self._offset_velocity = offset % 110
+            
+        return self._offset_velocity
 
     def program_number(self, prog=None):
         if prog is not None:
@@ -1069,7 +1080,6 @@ class Guitar_class:
         if param == self.PARAM_ALL:
             self._display.show_message('--GUITAR SETTINGS--', 0, 0, color)
             self._display.show_message('BUTTN: ' + str(self._chord_on_button_number + 1), 0, 9, color)
-            self._display.show_message('P-BND: {:+d}'.format(self.pitch_bend_range()), 0, 54, color)
             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
             self._display.show_message('CHORD: ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 18, color)
@@ -1088,9 +1098,18 @@ class Guitar_class:
 
         self._display.show()
 
+    def show_info_configs(self, param, color):
+        if param == self.PARAM_ALL:
+            self._display.show_message('--GUITAR CONFIGS--', 0, 0, color)
+            self._display.show_message('OFFSET VELOCITY : {:d}'.format(self.offset_velocity()), 0, 9, color)
+            self._display.show_message('VELOCITY CURVE  : {:3.1f}'.format(adc0.velocity_curve()), 0, 18, color)
+            self._display.show_message('PITCH BEND RANGE:{:+d}'.format(self.pitch_bend_range()), 0, 27, color)
+
+        self._display.show()
+
     # Play a string
-    def play_a_string(self, string, string_velosity, channel=0):
-#        print('PLAY a STRING VELO:', string_velosity)
+    def play_a_string(self, string, string_velocity, channel=0):
+#        print('PLAY a STRING VELO:', string_velocity)
         capo = self.capotasto()
 
         # Play strings in the current chord
@@ -1098,8 +1117,9 @@ class Guitar_class:
         chord_note = string_notes[string]
         if chord_note >= 0:
             # Note on
-            if string_velosity > 0:
-                synth.set_note_on(chord_note + capo, string_velosity, channel)
+            if string_velocity > 0:
+                velocity = string_velocity + self.offset_velocity()
+                synth.set_note_on(chord_note + capo, velocity if velocity <= 127 else 127, channel)
                 synth._usb_midi[channel].send(NoteOff(0, channel=channel))		# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
             # Note off
             else:
@@ -1108,7 +1128,7 @@ class Guitar_class:
 
         return chord_note
 
-    def play_chord(self, play=True, velosity=127, channel=0):
+    def play_chord(self, play=True, velocity=127, channel=0):
         try:
             capo = self.capotasto()
             notes_in_chord = self.chord_notes()        
@@ -1116,11 +1136,17 @@ class Guitar_class:
             # Play a chord selected
             if play:
                 print('CHORD NOTEs ON : ', notes_in_chord)
+                velocity = velocity + self.offset_velocity()
+                if velocity > 127:
+                    velocity = 127
+                    
                 count_nt = 0
                 for nt in notes_in_chord:
                     if nt >= 0:
-                        synth.set_note_on(nt + capo, velosity, channel)
+                        synth.set_note_on(nt + capo, velocity, channel)
+##                        synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
                         count_nt = count_nt + 1
+                        sleep(0.005)
 
                 if count_nt % 2 == 1:											# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
                     synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
@@ -1133,7 +1159,9 @@ class Guitar_class:
                 for nt in notes_in_chord:
                     if nt >= 0:
                         synth.set_note_off(nt + capo, 0)
+##                        synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
                         count_nt = count_nt + 1
+                        sleep(0.005)
 
                 if count_nt % 2 == 1:											# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
                     synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
@@ -1183,7 +1211,6 @@ class Guitar_class:
             print('EXCEPTION: ', e)
 
     def do_task_settings(self):
-        print('GUITAR SETTINGS')
         try:
             current_button = self.chord_on_button()
             
@@ -1238,6 +1265,24 @@ class Guitar_class:
 
         except Exception as e:
             print('EXCEPTION: ', e)
+
+    def do_task_configs(self):
+        try:
+            if   input_device.device_info('GUITAR_BASE_VOLUME') == False:
+                self.offset_velocity(self.offset_velocity() + 10)
+                self.show_info_configs(self.PARAM_ALL, 1)
+                
+            elif input_device.device_info('GUITAR_VELOCITY_CURVE') == False:
+                adc0.velocity_curve(adc0.velocity_curve() + 0.1)
+                self.show_info_configs(self.PARAM_ALL, 1)
+                
+            elif input_device.device_info('GUITAR_PITCH_BEND_RANGE') == False:
+                self.pitch_bend_range(self.pitch_bend_range() + 1)
+                synth.set_pitch_bend_range(self.pitch_bend_range(), 0)
+                self.show_info_configs(self.PARAM_ALL, 1)
+
+        except Exception as e:
+            print('EXCEPTION: ', e)
         
 ################# End of Guitar Class Definition #################
  
@@ -1254,6 +1299,7 @@ class Application_class:
         
         self.PLAY_GUITAR = 0
         self.GUITAR_SETTINGS = 1
+        self.GUITAR_CONFIGS = 2
         self._screen_mode = self.PLAY_GUITAR
 
         # Device aliases
@@ -1286,7 +1332,7 @@ class Application_class:
 
     def screen_mode(self, inst_num=None):
         if inst_num is not None:
-            self._screen_mode = inst_num % 2
+            self._screen_mode = inst_num % 3
             
         return self._screen_mode
 
@@ -1297,6 +1343,9 @@ class Application_class:
             
         elif sc_mode == self.GUITAR_SETTINGS:
             instrument_guitar.show_info_settings(param, 1)
+            
+        elif sc_mode == self.GUITAR_CONFIGS:
+            instrument_guitar.show_info_configs(param, 1)
 
     # Application task called from asyncio, never call this directly.
     def do_task(self):
@@ -1308,6 +1357,9 @@ class Application_class:
                 
             elif sc_mode == self.GUITAR_SETTINGS:
                 instrument_guitar.setup_settings()
+                
+            elif sc_mode == self.GUITAR_CONFIGS:
+                instrument_guitar.setup_configs()
 
             display.fill(0)
             self.show_info()
@@ -1317,8 +1369,13 @@ class Application_class:
         if   sc_mode == self.PLAY_GUITAR:
             instrument_guitar.do_task()
 
+        # Guitar settings
         elif sc_mode == self.GUITAR_SETTINGS:
             instrument_guitar.do_task_settings()
+
+        # Guitar configs
+        elif sc_mode == self.GUITAR_CONFIGS:
+            instrument_guitar.do_task_configs()
 
 
 ################# End of Application Class Definition #################
