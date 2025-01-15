@@ -47,6 +47,8 @@
 #     0.5.1: 01/15/2025
 #            Configuration screen: Offset velocity, Pitch bend range,
 #                                  Velocity curve.
+#     1.0.0: 01/15/2025
+#            Change the switchs' layout for the device box.
 #########################################################################
 
 import asyncio
@@ -871,9 +873,9 @@ class Guitar_class:
         input_device.device_alias('GUITAR_INSTRUMENT', 'BUTTON_7')
 
         # Device aliases for settings mode
-        input_device.device_alias('GUITAR_BASE_VOLUME',      'BUTTON_1')
-        input_device.device_alias('GUITAR_VELOCITY_CURVE',   'BUTTON_2')
-        input_device.device_alias('GUITAR_PITCH_BEND_RANGE', 'BUTTON_3')
+        input_device.device_alias('GUITAR_BASE_VOLUME',      'BUTTON_2')
+        input_device.device_alias('GUITAR_VELOCITY_CURVE',   'BUTTON_3')
+        input_device.device_alias('GUITAR_PITCH_BEND_RANGE', 'BUTTON_4')
 
     def setup(self):
         display.fill(0)
