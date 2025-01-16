@@ -51,6 +51,7 @@
 #            Change the switchs' layout for the device box.
 #     1.0.1: 01/16/2025
 #            Load chord set from file.
+#            Music player.
 #########################################################################
 
 import asyncio
@@ -688,6 +689,16 @@ class Guitar_class:
 
 #        print(self._chord_files)
 
+        # Music data
+        self._music_chord_num = -1
+        self._music = []
+        self._music_num = -1
+        self._music_list = []
+        with open('SYNTH/MUSIC/list.json', 'r') as f:
+            self._music_list = json.load(f)
+
+#        print(self._music_list)
+
         # Device aliases for play mode
         input_device.device_alias('GUITAR_CHORD_BANK', 'BUTTON_1')		# Chord set bank
         input_device.device_alias('GUITAR_CHORD1', 'BUTTON_2')
@@ -706,11 +717,19 @@ class Guitar_class:
         input_device.device_alias('GUITAR_CHORD_FILE', 'BUTTON_6')
         input_device.device_alias('GUITAR_INSTRUMENT', 'BUTTON_7')
 
-        # Device aliases for settings mode
+        # Device aliases for config mode
         input_device.device_alias('GUITAR_BASE_VOLUME',      'BUTTON_2')
         input_device.device_alias('GUITAR_VELOCITY_CURVE',   'BUTTON_3')
         input_device.device_alias('GUITAR_PITCH_BEND_RANGE', 'BUTTON_4')
         input_device.device_alias('GUITAR_CAPOTASTO',        'BUTTON_5')
+
+        # Device aliases for music mode
+        input_device.device_alias('GUITAR_CHORD_NEXT', 'BUTTON_1')
+        input_device.device_alias('GUITAR_MUSIC_PREV', 'BUTTON_2')
+        input_device.device_alias('GUITAR_MUSIC_NEXT', 'BUTTON_3')
+        input_device.device_alias('GUITAR_CHORD_PREV', 'BUTTON_5')
+        input_device.device_alias('GUITAR_CHORD_TOP',  'BUTTON_6')
+        input_device.device_alias('GUITAR_CHORD_LAST', 'BUTTON_7')
 
     def setup(self):
         display.fill(0)
@@ -728,6 +747,10 @@ class Guitar_class:
     def setup_configs(self):
         display.fill(0)
         self.show_info_configs(self.PARAM_ALL, 1)
+
+    def setup_music(self):
+        display.fill(0)
+        self.show_info_music(self.PARAM_ALL, 1)
 
     def capotasto(self, capo=None):
         if capo is not None:
@@ -822,8 +845,54 @@ class Guitar_class:
             return self._chord_file_num
 
         except Exception as e:
-          print(e, self._chord_files[self._chord_file_num][0])
-          return self._chord_file_num
+            print(e, self._chord_files[self._chord_file_num][0])
+            return self._chord_file_num
+
+    def music_file(self, file_num=None):
+        if file_num is None or len(self._music_list) <= 0:
+            return self._music_num
+
+        try:
+            self._music_num = file_num % len(self._music_list)
+            with open('SYNTH/MUSIC/' + self._music_list[self._music_num][0], 'r') as f:
+                json_data = json.load(f)
+
+            self._music_list[self._music_num][1] = json_data['NAME']
+            self._music = []
+            for chord in json_data['MUSIC']:
+                chord[0] = self.PARAM_GUITAR_ROOTs.index(chord[0]) if chord[0] in self.PARAM_GUITAR_ROOTs else 0
+                chord[1] = self.PARAM_GUITAR_CHORDs.index(chord[1]) if chord[1] in self.PARAM_GUITAR_CHORDs else 0
+                chord[2] = 1 if chord[2] == 'HIGH' else 0
+                chord[3] = self.PARAM_GUITAR_ROOTs.index(chord[3]) if chord[3] in self.PARAM_GUITAR_ROOTs else 0
+                self._music.append(chord)
+            
+            if len(self._music) > 0:
+                self._music.append([-1, -1, 0, -1])		# Sign at the end of music
+                self.music_chord(0)
+            else:
+                self._music_chord_num = -1
+
+            print('MUSIC ', self._music_num, self._music)
+            return self._music_num
+            
+        except Exception as e:
+            print(e, self._music_list[self._music_num][0])
+            return self._music_num
+
+    def music_chord(self, chord_num=None):
+        if chord_num is not None and len(self._music) > 0:
+            if chord_num < 0:
+                chord_num = len(self._music) - 2		# The last is the sign data at the end of music
+                
+            self._music_chord_num = chord_num % len(self._music)
+            if self._music_chord_num < len(self._music) - 1: 
+                chord = self._music[self._music_chord_num]
+                self.value_guitar_root  = chord[0]		# Current root
+                self.value_guitar_chord = chord[1]		# Current chord
+                self._chord_position    = chord[2]		# 0: Low chord, 1: High chord
+                self._scale_number      = chord[4]		# Scale
+
+        return self._music_chord_num
 
     def pitch_bend_range(self, bend_range=None):
         if bend_range is not None:
@@ -976,6 +1045,19 @@ class Guitar_class:
 
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CAPOTASTO:
             self._display.show_message('CAPOTASTO FRETS :{:+d}'.format(self.capotasto()), 0, 36, color)
+
+        self._display.show()
+
+    def show_info_music(self, param, color):
+        if param == self.PARAM_ALL:
+            self._display.show_message('--GUITAR MUSIC--', 0, 0, color)
+            music_name = self._music_list[self.music_file()][1]
+            self._display.show_message('MUSIC: ' + ('---' if self.music_file() < 0 else music_name[0:14]), 0, 9, color)
+            self._display.show_message('       ' + ('---' if self.music_file() < 0 else music_name[14:]), 0, 18, color)
+            chord = self.music_chord()
+            music_len = len(self._music)
+            self._display.show_message('PLAY : ' + ('---' if chord < 0 else str(chord + 1) + '/' + str(music_len - 1)), 0, 27, color)
+            self._display.show_message('CHORD: ' + ('---' if chord < 0 else ('END' if chord == music_len - 1 else self.chord_name()[1])), 0, 36, color)
 
         self._display.show()
 
@@ -1160,6 +1242,35 @@ class Guitar_class:
 
         except Exception as e:
             print('EXCEPTION: ', e)
+
+    def do_task_music(self):
+        try:
+            if   input_device.device_info('GUITAR_CHORD_NEXT') == False:
+                self.music_chord(self.music_chord() + 1)
+                self.show_info_music(self.PARAM_ALL, 1)
+                
+            elif input_device.device_info('GUITAR_MUSIC_PREV') == False:
+                self.music_file(self.music_file() - 1)
+                self.show_info_music(self.PARAM_ALL, 1)
+
+            elif input_device.device_info('GUITAR_MUSIC_NEXT') == False:
+                self.music_file(self.music_file() + 1)
+                self.show_info_music(self.PARAM_ALL, 1)
+
+            elif input_device.device_info('GUITAR_CHORD_PREV') == False:
+                self.music_chord(self.music_chord() - 1)
+                self.show_info_music(self.PARAM_ALL, 1)
+
+            elif input_device.device_info('GUITAR_CHORD_TOP') == False:
+                self.music_chord(0)
+                self.show_info_music(self.PARAM_ALL, 1)
+
+            elif input_device.device_info('GUITAR_CHORD_LAST') == False:
+                self.music_chord(-1)
+                self.show_info_music(self.PARAM_ALL, 1)
+                
+        except Exception as e:
+            print('EXCEPTION: ', e)
         
 ################# End of Guitar Class Definition #################
  
@@ -1177,6 +1288,7 @@ class Application_class:
         self.PLAY_GUITAR = 0
         self.GUITAR_SETTINGS = 1
         self.GUITAR_CONFIGS = 2
+        self.PLAY_MUSIC = 3
         self._screen_mode = self.PLAY_GUITAR
 
         # Device aliases
@@ -1209,7 +1321,7 @@ class Application_class:
 
     def screen_mode(self, inst_num=None):
         if inst_num is not None:
-            self._screen_mode = inst_num % 3
+            self._screen_mode = inst_num % 4
             
         return self._screen_mode
 
@@ -1237,6 +1349,9 @@ class Application_class:
                 
             elif sc_mode == self.GUITAR_CONFIGS:
                 instrument_guitar.setup_configs()
+                
+            elif sc_mode == self.PLAY_MUSIC:
+                instrument_guitar.setup_music()
 
             display.fill(0)
             self.show_info()
@@ -1253,6 +1368,10 @@ class Application_class:
         # Guitar configs
         elif sc_mode == self.GUITAR_CONFIGS:
             instrument_guitar.do_task_configs()
+
+        # Play a music
+        elif sc_mode == self.PLAY_MUSIC:
+            instrument_guitar.do_task_music()
 
 
 ################# End of Application Class Definition #################
