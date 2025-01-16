@@ -52,6 +52,7 @@
 #     1.0.1: 01/16/2025
 #            Load chord set from file.
 #            Music player.
+#            On note chord is available.
 #########################################################################
 
 import asyncio
@@ -654,6 +655,7 @@ class Guitar_class:
         
         self.value_guitar_root = 0		# Current root
         self.value_guitar_chord = 0		# Current chord
+        self.value_guitar_on_note = -1	# Current on note (-1 means no note)
         
         self._programs = [-1, 24, 25, 26, 27, 28, 29, 30, 31, 104, 105, 106, 107]	# Instrument number in GM
         self._program_number = 0  		# Steel Guitar
@@ -667,18 +669,18 @@ class Guitar_class:
         self._chord_bank = 0
         self._chord_on_button_number = 0
         self._chord_on_button = [
-                {'ROOT': 0, 'CHORD': 0, 'POSITION': 0, 'SCALE': 4},		# CM Low
-                {'ROOT': 7, 'CHORD': 0, 'POSITION': 0, 'SCALE': 4},		# GM Low
-                {'ROOT': 9, 'CHORD': 5, 'POSITION': 0, 'SCALE': 4},		# Am Low
-                {'ROOT': 4, 'CHORD': 5, 'POSITION': 0, 'SCALE': 4},		# Em Low
-                {'ROOT': 5, 'CHORD': 0, 'POSITION': 0, 'SCALE': 4},		# FM Low
-                {'ROOT': 2, 'CHORD': 5, 'POSITION': 0, 'SCALE': 4},		# Dm Low
-                {'ROOT': 0, 'CHORD': 0, 'POSITION': 1, 'SCALE': 4},		# CM High
-                {'ROOT': 7, 'CHORD': 0, 'POSITION': 1, 'SCALE': 4},		# GM High
-                {'ROOT': 9, 'CHORD': 5, 'POSITION': 1, 'SCALE': 4},		# Am High
-                {'ROOT': 4, 'CHORD': 5, 'POSITION': 1, 'SCALE': 4},		# Em High
-                {'ROOT': 5, 'CHORD': 0, 'POSITION': 1, 'SCALE': 4},		# FM High
-                {'ROOT': 2, 'CHORD': 5, 'POSITION': 1, 'SCALE': 4}		# Dm High
+                {'ROOT': 0, 'CHORD': 0, 'POSITION': 0, 'ON_NOTE': -1, 'SCALE': 4},		# CM Low
+                {'ROOT': 7, 'CHORD': 0, 'POSITION': 0, 'ON_NOTE': -1, 'SCALE': 4},		# GM Low
+                {'ROOT': 9, 'CHORD': 5, 'POSITION': 0, 'ON_NOTE': -1, 'SCALE': 4},		# Am Low
+                {'ROOT': 4, 'CHORD': 5, 'POSITION': 0, 'ON_NOTE': -1, 'SCALE': 4},		# Em Low
+                {'ROOT': 5, 'CHORD': 0, 'POSITION': 0, 'ON_NOTE': -1, 'SCALE': 4},		# FM Low
+                {'ROOT': 2, 'CHORD': 5, 'POSITION': 0, 'ON_NOTE': -1, 'SCALE': 4},		# Dm Low
+                {'ROOT': 0, 'CHORD': 0, 'POSITION': 1, 'ON_NOTE': -1, 'SCALE': 4},		# CM High
+                {'ROOT': 7, 'CHORD': 0, 'POSITION': 1, 'ON_NOTE': -1, 'SCALE': 4},		# GM High
+                {'ROOT': 9, 'CHORD': 5, 'POSITION': 1, 'ON_NOTE': -1, 'SCALE': 4},		# Am High
+                {'ROOT': 4, 'CHORD': 5, 'POSITION': 1, 'ON_NOTE': -1, 'SCALE': 4},		# Em High
+                {'ROOT': 5, 'CHORD': 0, 'POSITION': 1, 'ON_NOTE': -1, 'SCALE': 4},		# FM High
+                {'ROOT': 2, 'CHORD': 5, 'POSITION': 1, 'ON_NOTE': -1, 'SCALE': 4}		# Dm High
             ]
 
         # Preset chord set files
@@ -794,7 +796,7 @@ class Guitar_class:
         
         return instrument[0:guitar_pos][0:guitar_pos - dels] + instrument[guitar_pos:]
 
-    def chord_on_button(self, button=None, root=None, chord=None, position=None, scale=None):
+    def chord_on_button(self, button=None, root=None, chord=None, position=None, scale=None, on_note=None):
         if button is None:
             return self._chord_on_button_number
         
@@ -812,6 +814,9 @@ class Guitar_class:
         
         if scale is not None:
             self._chord_on_button[button]['SCALE'] = scale % 9
+        
+        if on_note is not None:
+            self._chord_on_button[button]['ON_NOTE'] = on_note % 12
         
         return self._chord_on_button[button]
 
@@ -831,16 +836,24 @@ class Guitar_class:
                 
                 data = chord[0]
                 index = self.PARAM_GUITAR_ROOTs.index(data) if data in self.PARAM_GUITAR_ROOTs else 0
-                self._chord_on_button[cd]['ROOT']     = index
+                self._chord_on_button[cd]['ROOT'] = index
 
                 data = 'M' if len(chord[1]) == 0 else chord[1]
                 index = self.PARAM_GUITAR_CHORDs.index(data) if data in self.PARAM_GUITAR_CHORDs else 0
-                self._chord_on_button[cd]['CHORD']    = index
+                self._chord_on_button[cd]['CHORD'] = index
 
-                data = 'LOW' if len(chord[1]) == 0 else chord[1]
-                self._chord_on_button[cd]['POSITION'] = 1 if chord[2] == 'HIGH' else 0
+                data = 'LOW' if len(chord[1]) == 0 else chord[2]
+                self._chord_on_button[cd]['POSITION'] = 1 if data == 'HIGH' else 0
                 
-                self._chord_on_button[cd]['SCALE']    = chord[3]
+                data = chord[3]
+                if data in self.PARAM_GUITAR_ROOTs:
+                    index = self.PARAM_GUITAR_ROOTs.index(data) if data in self.PARAM_GUITAR_ROOTs else 0
+                else:
+                    index = -1
+                    
+                self._chord_on_button[cd]['ON_NOTE'] = index
+                
+                self._chord_on_button[cd]['SCALE'] = chord[4]
                         
             return self._chord_file_num
 
@@ -863,7 +876,7 @@ class Guitar_class:
                 chord[0] = self.PARAM_GUITAR_ROOTs.index(chord[0]) if chord[0] in self.PARAM_GUITAR_ROOTs else 0
                 chord[1] = self.PARAM_GUITAR_CHORDs.index(chord[1]) if chord[1] in self.PARAM_GUITAR_CHORDs else 0
                 chord[2] = 1 if chord[2] == 'HIGH' else 0
-                chord[3] = self.PARAM_GUITAR_ROOTs.index(chord[3]) if chord[3] in self.PARAM_GUITAR_ROOTs else 0
+                chord[3] = self.PARAM_GUITAR_ROOTs.index(chord[3]) if chord[3] in self.PARAM_GUITAR_ROOTs else -1
                 self._music.append(chord)
             
             if len(self._music) > 0:
@@ -887,10 +900,11 @@ class Guitar_class:
             self._music_chord_num = chord_num % len(self._music)
             if self._music_chord_num < len(self._music) - 1: 
                 chord = self._music[self._music_chord_num]
-                self.value_guitar_root  = chord[0]		# Current root
-                self.value_guitar_chord = chord[1]		# Current chord
-                self._chord_position    = chord[2]		# 0: Low chord, 1: High chord
-                self._scale_number      = chord[4]		# Scale
+                self.value_guitar_root    = chord[0]	# Current root
+                self.value_guitar_chord   = chord[1]	# Current chord
+                self._chord_position      = chord[2]	# 0: Low chord, 1: High chord
+                self.value_guitar_on_note = chord[3]	# on-note
+                self._scale_number        = chord[4]	# Scale
 
         return self._music_chord_num
 
@@ -911,6 +925,7 @@ class Guitar_class:
         button_data = self._chord_on_button[button]
         self.value_guitar_root = button_data['ROOT']		# Current root
         self.value_guitar_chord = button_data['CHORD']		# Current chord
+        self.value_guitar_on_note = button_data['ON_NOTE']	# On note
         self._chord_position = button_data['POSITION']		# 0: Low chord, 1: High chord
         self._scale_number = button_data['SCALE']
 
@@ -961,7 +976,15 @@ class Guitar_class:
             chord_position = self.chord_position()
             
         (root_name, chord_name) = self.chord_name(chord_position, root, chord, scale)
-        notes = []
+        
+        # Simple chord
+        if self.value_guitar_on_note < 0:
+            notes = []
+            
+        # A chord with on-note like C on D
+        else:
+            notes = [self.value_guitar_on_note + (self._scale_number + 1) * 12]
+            
 #        print('CHORD NAME: ', chord_name, self.CHORD_STRUCTURE[chord_name][chord_position])
         fret_map = self.CHORD_STRUCTURE[chord_name][chord_position]
         for strings in list(range(6)):
@@ -999,6 +1022,19 @@ class Guitar_class:
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CHORD or param == self.PARAM_GUITAR_ROOT:
             self._display.show_message(self.PARAM_GUITAR_CHORDs[self.value_guitar_chord] + '  ' + ('L' if self.chord_position() == 0 else 'H') + ' {:+d}'.format(self.capotasto()), 12, 9, color)
 
+            # On-note
+            if self.value_guitar_on_note >= 0:
+                st = synth.get_note_name(self.value_guitar_on_note) + str(self._scale_number)
+                if len(st) <= 2:
+                    st = st + ' '
+            else:
+                st = '-- '
+                
+            print('ON NOTE:', self.value_guitar_on_note, '/' + st + '/')
+            for y in list(range(3)):
+                self._display.show_message(st[y], 72, 9 + y * 9, color)
+                
+            # Notes in chord
             notes = self.chord_notes()
             print('NOTES=', notes)
             for i in list(range(6)):
@@ -1057,7 +1093,12 @@ class Guitar_class:
             chord = self.music_chord()
             music_len = len(self._music)
             self._display.show_message('PLAY : ' + ('---' if chord < 0 else str(chord + 1) + '/' + str(music_len - 1)), 0, 27, color)
-            self._display.show_message('CHORD: ' + ('---' if chord < 0 else ('END' if chord == music_len - 1 else self.chord_name()[1])), 0, 36, color)
+
+            if self.value_guitar_on_note >= 0:
+                on_note = ' on ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_on_note]
+            else:
+                on_note = ''
+            self._display.show_message('CHORD: ' + ('---' if chord < 0 else ('END' if chord == music_len - 1 else self.chord_name()[1] + on_note)), 0, 36, color)
 
         self._display.show()
 
@@ -1102,8 +1143,8 @@ class Guitar_class:
                         count_nt = count_nt + 1
                         sleep(0.005)
 
-                if count_nt % 2 == 1:											# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
-                    synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+###                if count_nt % 2 == 1:											# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+###                    synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
             # Notes in chord off
             else:
@@ -1179,25 +1220,25 @@ class Guitar_class:
             
             if input_device.device_info('GUITAR_ROOT') == False:
                 print('GUITAR_ROOT')
-                self.chord_on_button(current_button, button_data['ROOT'] + 1)
+                self.chord_on_button(current_button, button_data['ROOT'] + 1, None, None, None, -1)
                 self.set_chord_on_button(current_button)
                 self.show_info_settings(self.PARAM_ALL, 1)
         
             if input_device.device_info('GUITAR_CHORD') == False:
                 print('GUITAR_CHORD')
-                self.chord_on_button(current_button, None, button_data['CHORD'] + 1)
+                self.chord_on_button(current_button, None, button_data['CHORD'] + 1, None, None, -1)
                 self.set_chord_on_button(current_button)
                 self.show_info_settings(self.PARAM_ALL, 1)
         
             if input_device.device_info('GUITAR_POSITION') == False:
                 print('GUITAR_POSITION')
-                self.chord_on_button(current_button, None, None, button_data['POSITION'] + 1)
+                self.chord_on_button(current_button, None, None, button_data['POSITION'] + 1, None, -1)
                 self.set_chord_on_button(current_button)
                 self.show_info_settings(self.PARAM_ALL, 1)
         
             if input_device.device_info('GUITAR_OCTAVE') == False:
                 print('GUITAR_OCTAVE')
-                self.chord_on_button(current_button, None, None, None, button_data['SCALE'] + 1)
+                self.chord_on_button(current_button, None, None, None, button_data['SCALE'] + 1, -1)
                 self.set_chord_on_button(current_button)
                 self.show_info_settings(self.PARAM_ALL, 1)
         
