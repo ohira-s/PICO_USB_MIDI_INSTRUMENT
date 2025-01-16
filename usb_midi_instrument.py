@@ -228,7 +228,7 @@ class ADC_Device_class:
         self._voltage_gate = [(400.0,200.0)] * 8		# for Resistor elements
         self._adc_on = [False] * 8
         
-        self._velocity_curve = 2.4
+        self._velocity_curve = 2.7
 
     def adc(self):
         return self._adc
@@ -660,7 +660,7 @@ class Guitar_class:
         self._chord_position = 0		# 0: Low chord, 1: High chord
         self._capotasto = 0				# No capotasto (-12..0..+12)
         self._pitch_bend_range = 2		# 1 is semitone (0..12)
-        self._offset_velocity = 0		# Note on velocity offset (0,10,20,...,100)
+        self._offset_velocity = 30		# Note on velocity offset (0,10,20,...,100)
 
         # Chord on button
         self._chord_bank = 0
@@ -686,7 +686,7 @@ class Guitar_class:
         with open('SYNTH/CHORD/list.json', 'r') as f:
             self._chord_files = json.load(f)
 
-        print(self._chord_files)
+#        print(self._chord_files)
 
         # Device aliases for play mode
         input_device.device_alias('GUITAR_CHORD_BANK', 'BUTTON_1')		# Chord set bank
