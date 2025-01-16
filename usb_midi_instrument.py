@@ -60,7 +60,7 @@ from board import *
 import digitalio
 from busio import I2C			# for I2C
 from time import sleep
-import os, re
+#import os, re
 import json
 
 import usb_midi					# for USB MIDI
@@ -951,7 +951,7 @@ class Guitar_class:
             self._display.show_message('--GUITAR SETTINGS--', 0, 0, color)
             self._display.show_message('BUTTN: ' + str(self._chord_on_button_number + 1), 0, 9, color)
             index = self.chord_file()
-            self._display.show_message('FILE : ' + self._chord_files[index][1] if index >= 0 else '---', 0, 36, color)
+            self._display.show_message('FILE : ' + (self._chord_files[index][1] if index >= 0 else '---'), 0, 36, color)
             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
             self._display.show_message('CHORD: ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 18, color)
