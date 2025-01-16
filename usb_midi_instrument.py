@@ -49,6 +49,8 @@
 #                                  Velocity curve.
 #     1.0.0: 01/15/2025
 #            Change the switchs' layout for the device box.
+#     1.0.1: 01/16/2025
+#            Load chord set from file.
 #########################################################################
 
 import asyncio
@@ -633,188 +635,12 @@ class Guitar_class:
         self.PARAM_GUITAR_ROOTs = synth._note_key
         self.PARAM_GUITAR_CHORDs = ['M', 'M7', '7', '6', 'aug', 'm', 'mM7', 'm7', 'm6', 'm7-5', 'add9', 'sus4', '7sus4', 'dim7']
         self.GUITAR_STRINGS_OPEN = [16,11, 7, 2, -3, -8]	# 1st String: E, B, G, D, A, E: 6th String
-        self.CHORD_STRUCTURE = {
-            #Chord   : LO:1  2  3  4  5  6  HI:1  2  3  4  5  6			# Strings
-            'CM'     : ([ 0, 1, 0, 2, 3,-1], [ 3, 5, 5, 5, 3,-1]),		# Fret number to press (-1 is not to play it)
-            'CM7'    : ([ 0, 0, 0, 2, 3,-1], [ 3, 5, 4, 5, 3,-1]),
-            'C7'     : ([ 0, 1, 3, 2, 3,-1], [ 3, 5, 3, 5, 3,-1]),
-            'C6'     : ([ 0, 1, 2, 2, 3,-1], [ 5, 5, 5, 5, 3,-1]),
-            'Caug'   : ([-1, 1, 1, 2, 3,-1], [ 8, 9, 9,10,-1,-1]),
-            'Cm'     : ([ 3, 4, 5, 5, 3,-1], [ 8, 8, 8,10,10, 8]),
-            'CmM7'   : ([ 3, 4, 4, 5, 3,-1], [ 8, 8, 8, 9,10, 8]),
-            'Cm7'    : ([ 3, 4, 3, 5, 3,-1], [ 8, 8, 8, 8,10, 8]),
-            'Cm6'    : ([ 3, 1, 2, 1, 3,-1], [ 8,10, 8,10,10, 8]),
-            'Cm7-5'  : ([-1, 4, 3, 4, 3,-1], [12,12,12,10,-1,-1]),
-            'Cadd9'  : ([ 0, 3, 0, 2, 3,-1], [ 3, 3, 5, 5, 3,-1]),
-            'Csus4'  : ([ 1, 1, 0, 3, 3,-1], [ 8, 8,10,10,10, 8]),
-            'C7sus4' : ([ 3, 6, 3, 5, 3,-1], [ 8, 8,10, 8,10, 8]),
-            'Cdim7'  : ([-1, 4, 2, 4, 3,-1], [11,10,11,10,-1,-1]),
 
-            'C#M'    : ([ 4, 6, 6, 6, 4,-1], [ 9, 9,10,11,11, 9]),
-            'C#M7'   : ([ 4, 6, 5, 6, 4,-1], [ 9,10,11,12,-1,-1]),
-            'C#7'    : ([ 4, 6, 4, 6, 4,-1], [ 9, 9,10, 9,11, 9]),
-            'C#6'    : ([ 6, 6, 6, 6, 4,-1], [ 9,11,10,11,-1,-1]),
-            'C#aug'  : ([-1, 2, 2, 3, 4,-1], [ 9,10,10,11,-1,-1]),
-            'C#m'    : ([ 4, 5, 6, 6, 4,-1], [ 9, 9, 9,11,11, 9]),
-            'C#mM7'  : ([ 4, 5, 5, 6, 4,-1], [ 9, 9, 9,10,11, 9]),
-            'C#m7'   : ([ 4, 5, 4, 6, 4,-1], [12,12,12,10,-1,-1]),
-            'C#m6'   : ([ 4, 2, 3, 2, 4,-1], [ 9,11, 9,11,11, 9]),
-            'C#m7-5' : ([-1, 5, 4, 5, 4,-1], [12,12,12,10,-1,-1]),
-            'C#add9' : ([ 4, 4, 6, 6, 4,-1], [10, 8, 9,10,-1,-1]),
-            'C#sus4' : ([ 4, 7, 6, 6, 4,-1], [ 9, 9,11,11,11, 9]),
-            'C#7sus4': ([ 4, 7, 4, 6, 4,-1], [ 9, 9,11, 9,11, 9]),
-            'C#dim7' : ([-1, 5, 3, 5, 4,-1], [12,11,12,11,-1,-1]),
-
-            'DM'     : ([ 2, 3, 2, 0,-1,-1], [ 5, 7, 7, 7, 5,-1]),
-            'DM7'    : ([ 2, 2, 2, 0,-1,-1], [ 5, 7, 6, 7, 5,-1]),
-            'D7'     : ([ 2, 1, 2, 0,-1,-1], [ 5, 7, 5, 7, 5,-1]),
-            'D6'     : ([ 2, 0, 2, 0,-1,-1], [ 7, 7, 7, 7, 5,-1]),
-            'Daug'   : ([ 2, 3, 3, 0,-1,-1], [11,12,12,13,-1,-1]),
-            'Dm'     : ([ 1, 3, 2, 0,-1,-1], [ 5, 6, 7, 7, 5,-1]),
-            'DmM7'   : ([ 1, 2, 2, 0,-1,-1], [ 5, 6, 6, 7, 5,-1]),
-            'Dm7'    : ([ 1, 1, 2, 0,-1,-1], [ 5, 6, 5, 7, 5,-1]),
-            'Dm6'    : ([ 1, 0, 2, 0,-1,-1], [-1,10,10, 9,-1,10]),
-            'Dm7-5'  : ([ 1, 1, 1, 0,-1,-1], [-1, 6, 5, 6, 5,-1]),
-            'Dadd9'  : ([ 0, 3, 2, 0,-1,-1], [ 5, 5, 7, 7, 5,-1]),
-            'Dsus4'  : ([ 3, 3, 2, 0,-1,-1], [ 5, 8, 7, 7, 5,-1]),
-            'D7sus4' : ([ 3, 1, 2, 0,-1,-1], [ 5, 8, 5, 7, 5,-1]),
-            'Ddim7'  : ([ 1, 0, 1, 0,-1,-1], [-1, 9,10, 9,-1,10]),
-
-            'D#M'    : ([ 6, 8, 8, 8, 6,-1], [ 6, 8, 8, 8, 6,-1]),
-            'D#M7'   : ([ 6, 8, 7, 8, 6,-1], [ 6, 8, 7, 8, 6,-1]),
-            'D#7'    : ([ 6, 8, 6, 8, 6,-1], [ 6, 8, 6, 8, 6,-1]),
-            'D#6'    : ([ 8, 8, 8, 8, 6,-1], [ 8, 8, 8, 8, 6,-1]),
-            'D#aug'  : ([-1, 4, 4, 5, 6,-1], [ 6, 7, 7, 8,-1,-1]),
-            'D#m'    : ([ 6, 7, 8, 8, 6,-1], [ 6, 7, 8, 8, 6,-1]),
-            'D#mM7'  : ([ 6, 7, 7, 8, 6,-1], [ 6, 7, 7, 8, 6,-1]),
-            'D#m7'   : ([ 6, 7, 6, 8, 6,-1], [ 6, 7, 6, 8, 6,-1]),
-            'D#m6'   : ([ 6, 4, 5, 4, 6,-1], [-1,10,10, 9,-1,10]),
-            'D#m7-5' : ([-1, 7, 6, 7, 6,-1], [-1, 7, 6, 7, 6,-1]),
-            'D#add9' : ([ 6, 6, 8, 8, 6,-1], [ 6, 6, 8, 8, 6,-1]),
-            'D#sus4' : ([ 6, 9, 8, 8, 6,-1], [ 6, 9, 8, 8, 6,-1]),
-            'D#7sus4': ([ 6, 9, 6, 8, 6,-1], [ 6, 9, 6, 8, 6,-1]),
-            'D#dim7' : ([-1, 7, 5, 7, 6,-1], [10, 9,10, 9,-1,-1]),
-
-            'EM'     : ([ 0, 0, 1, 2, 2, 0], [ 7, 9, 9, 9, 7,-1]),
-            'EM7'    : ([ 0, 0, 1, 1, 2, 0], [ 7, 9, 8, 9, 7,-1]),
-            'E7'     : ([ 0, 0, 1, 0, 2, 0], [ 7, 9, 7, 9, 7,-1]),
-            'E6'     : ([ 0, 2, 1, 2, 2, 0], [ 9, 9, 9, 9, 7,-1]),
-            'Eaug'   : ([ 0, 2, 2, 3,-1,-1], [-1, 5, 5, 6, 7,-1]),
-            'Em'     : ([ 0, 0, 0, 2, 2, 0], [ 7, 8, 7, 9, 7,-1]),
-            'EmM7'   : ([-1, 0, 0, 1, 2, 0], [ 7, 8, 8, 9, 7,-1]),
-            'Em7'    : ([ 0, 0, 0, 0, 2, 0], [ 7, 8, 7, 9, 7,-1]),
-            'Em6'    : ([ 0, 2, 0, 2, 2, 0], [-1,12,12,11,-1,12]),
-            'Em7-5'  : ([ 0, 3, 0, 2, 1, 0], [-1, 8, 7, 8, 7,-1]),
-            'Eadd9'  : ([ 0, 0, 1, 4, 2, 0], [ 7, 7, 9, 9, 7,-1]),
-            'Esus4'  : ([ 0, 0, 2, 2, 2, 0], [ 7,10, 9, 9, 7,-1]),
-            'E7sus4' : ([ 0, 0, 2, 0, 2, 0], [ 7,10, 7, 9, 7,-1]),
-            'Edim7'  : ([ 0, 2, 0, 2, 1, 0], [-1,11,12,11,-1,12]),
-
-            'FM'     : ([ 1, 1, 2, 3, 3, 1], [ 8,10,10,10, 8,-1]),
-            'FM7'    : ([-1, 1, 2, 2,-1, 1], [ 8,10, 9,10, 8,-1]),
-            'F7'     : ([ 1, 1, 2, 1, 3, 1], [ 8,10, 8,10, 8,-1]),
-            'F6'     : ([ 1, 3, 2, 3, 1, 1], [10,10,10,10, 8,-1]),
-            'Faug'   : ([ 1, 2, 2, 3,-1.-1], [-1, 6, 6, 7, 8,-1]),
-            'Fm'     : ([ 1, 1, 1, 3, 3, 1], [ 8, 9,10,10, 8,-1]),
-            'FmM7'   : ([ 1, 1, 1, 2, 3, 1], [ 8, 9, 9,10, 8,-1]),
-            'Fm7'    : ([ 1, 1, 1, 1, 3, 1], [ 8, 9, 8,10, 8,-1]),
-            'Fm6'    : ([ 1, 3, 1, 3, 3, 1], [12,11,13,11,-1,-1]),
-            'Fm7-5'  : ([-1, 0, 1, 1,-1, 1], [-1, 9, 8, 9, 8,-1]),
-            'Fadd9'  : ([ 3, 1, 2, 3,-1,-1], [ 8, 8,10,10, 8,-1]),
-            'Fsus4'  : ([ 1, 1, 3, 3, 3, 1], [ 8,11,10,10, 8,-1]),
-            'F7sus4' : ([ 1, 1, 3, 1, 3, 1], [ 8,11, 8,10, 8,-1]),
-            'Fdim7'  : ([ 1, 0, 1, 0,-1, 1], [-1,12,13,12,-1,13]),
-
-            'F#M'    : ([ 2, 2, 3, 4, 4, 2], [ 9,11,11,11, 9, 9]),
-            'F#M7'   : ([-1, 2, 3, 3,-1, 2], [ 9,11,10,11, 9, 9]),
-            'F#7'    : ([ 2, 2, 3, 2, 4, 2], [ 9,11, 9,11, 9, 9]),
-            'F#6'    : ([ 2, 4, 3, 4, 2, 2], [11,11,11,11, 9, 9]),
-            'F#aug'  : ([ 2, 3, 3, 4,-1,-1], [ 6, 7, 7, 8,-1,-1]),
-            'F#m'    : ([ 2, 2, 2, 4, 4, 2], [ 9,10,11,11, 9, 9]),
-            'F#mM7'  : ([ 2, 2, 2, 3, 4, 2], [ 9,10,10,11, 9, 9]),
-            'F#m7'   : ([ 2, 2, 2, 2, 4, 2], [ 9,10, 9,11, 9, 9]),
-            'F#m6'   : ([ 2, 4, 2, 4, 4, 2], [ 5, 4, 6, 4,-1,-1]),
-            'F#m7-5' : ([ 0, 1, 2, 2,-1, 2], [-1,10, 9,10, 9,-1]),
-            'F#add9' : ([ 4, 2, 3, 4,-1,-1], [-1, 7, 6, 6, 9,-1]),
-            'F#sus4' : ([ 2, 2, 4, 4, 4, 2], [ 9,12,11,11, 9, 9]),
-            'F#7sus4': ([ 2, 2, 4, 2, 4, 2], [ 9,12, 9,11, 9, 9]),
-            'F#dim7' : ([-1, 1, 2, 1,-1, 2], [ 5, 4, 5, 4,-1,-1]),
-
-            'GM'     : ([ 3, 0, 0, 0, 2, 3], [ 3, 3, 4, 5, 5, 3]),
-            'GM7'    : ([ 2, 0, 0, 0, 2, 3], [ 7, 7, 7, 5,-1,-1]),
-            'G7'     : ([ 1, 0, 0, 0, 2, 3], [ 3, 3, 4, 3, 5, 3]),
-            'G6'     : ([ 0, 0, 0, 0, 2, 3], [12,12,12,12,10,-1]),
-            'Gaug'   : ([ 3, 4, 4, 5,-1,-1], [-1, 8, 8, 9,10,-1]),
-            'Gm'     : ([ 3, 3, 3, 5, 5, 3], [10,11,12,12,10,-1]),
-            'GmM7'   : ([ 3, 3, 3, 4, 5, 3], [10,11,11,12,10,-1]),
-            'Gm7'    : ([ 3, 3, 3, 3, 5, 3], [10,11,10,12,10,-1]),
-            'Gm6'    : ([ 3, 5, 3, 5, 5, 3], [ 6, 5, 7, 5,-1,-1]),
-            'Gm7-5'  : ([-1, 2, 3, 3,-1, 3], [ 7, 7, 7, 5,-1,-1]),
-            'Gadd9'  : ([ 3, 0, 2, 0, 0, 3], [10,10,12,12,10,-1]),
-            'Gsus4'  : ([ 3, 1, 0, 0, 3, 3], [ 3, 3, 5, 5, 5, 3]),
-            'G7sus4' : ([ 3, 3, 5, 3, 5, 3], [ 3, 3, 5, 3, 5, 3]),
-            'Gdim7'  : ([-1, 2, 3, 2,-1, 3], [ 6, 5, 6, 5,-1,-1]),
-
-            'G#M'    : ([ 4, 4, 5, 6, 6, 4], [11,13,13,13,11,-1]),
-            'G#M7'   : ([-1, 4, 5, 5,-1, 4], [11,13,12,13,11,-1]),
-            'G#7'    : ([ 4, 4, 5, 4, 6, 4], [-1, 9,11,10,11,-1]),
-            'G#6'    : ([-1, 4, 5, 3,-1, 4], [-1, 9,10,10,11,-1]),
-            'G#aug'  : ([ 4, 5, 5, 6,-1,-1], [-1, 9, 9,10,11,-1]),
-            'G#m'    : ([ 4, 4, 4, 6, 6, 4], [11,12,13,13,11,-1]),
-            'G#mM7'  : ([ 4, 4, 4, 5, 6, 4], [11,12,12,13,11,-1]),
-            'G#m7'   : ([ 4, 4, 4, 4, 6, 4], [11,12,11,13,11,-1]),
-            'G#m6'   : ([ 4, 6, 4, 6, 6, 4], [ 7, 6, 8, 6,-1,-1]),
-            'G#m7-5' : ([ 0, 3, 4, 4,-1, 4], [ 7, 7, 7, 6,-1,-1]),
-            'G#add9' : ([ 6, 4, 5, 6,-1,-1], [11,11,13,13,11,-1]),
-            'G#sus4' : ([ 4, 4, 6, 6, 6, 4], [11,14,13,13,11,-1]),
-            'G#7sus4': ([ 4, 4, 6, 4, 6, 4], [11,14,11,13,11,-1]),
-            'G#dim7' : ([-1, 3, 4, 3,-1, 4], [ 7, 6, 7, 6,-1,-1]),
-
-            'AM'     : ([ 0, 2, 2, 2, 0,-1], [ 5, 5, 6, 7, 7, 5]),
-            'AM7'    : ([ 0, 2, 1, 2, 0,-1], [-1, 5, 6, 6,-1, 5]),
-            'A7'     : ([ 0, 2, 0, 2, 0,-1], [ 5, 5, 6, 5, 7, 5]),
-            'A6'     : ([ 2, 2, 2, 2, 0,-1], [-1,10,11,11,12,-1]),
-            'Aaug'   : ([ 1, 2, 2, 3, 0,-1], [ 5, 6, 6, 7,-1,-1]),
-            'Am'     : ([ 0, 1, 2, 2, 0,-1], [ 5, 5, 5, 7, 7, 5]),
-            'AmM7'   : ([ 0, 1, 1, 2, 0,-1], [ 5, 5, 5, 6, 7, 5]),
-            'Am7'    : ([ 0, 1, 0, 2, 0,-1], [ 5, 5, 5, 5, 7, 5]),
-            'Am6'    : ([ 2, 1, 2, 2, 0,-1], [-1, 6, 6, 5,-1, 6]),
-            'Am7-5'  : ([-1, 1, 0, 1, 0,-1], [ 9, 9, 9, 7,-1,-1]),
-            'Aadd9'  : ([ 0, 0, 2, 2, 0,-1], [ 7, 5, 6, 7,-1,-1]),
-            'Asus4'  : ([ 0, 3, 2, 2, 0,-1], [ 5, 5, 7, 7, 7, 5]),
-            'A7sus4' : ([ 0, 3, 0, 2, 0,-1], [ 5, 5, 7, 5, 7, 5]),
-            'Adim7'  : ([ 2, 1, 2, 1, 0,-1], [-1, 4, 5, 4,-1, 5]),
-
-            'A#M'    : ([ 1, 3, 3, 3, 1,-1], [ 6, 6, 7, 8, 8, 6]),
-            'A#M7'   : ([ 1, 3, 2, 3, 1,-1], [-1, 6, 7, 7,-1, 6]),
-            'A#7'    : ([ 1, 3, 1, 3, 1,-1], [ 6, 6, 7, 6, 8, 6]),
-            'A#6'    : ([ 3, 3, 3, 3, 1,-1], [-1,11,12,12,13,-1]),
-            'A#aug'  : ([ 6, 7, 7, 8,-1,-1], [ 6, 7, 7, 8,-1,-1]),
-            'A#m'    : ([ 1, 2, 3, 3, 1,-1], [ 6, 6, 6, 8, 8, 6]),
-            'A#mM7'  : ([ 1, 2, 2, 3, 1,-1], [ 6, 6, 6, 7, 8, 6]),
-            'A#m7'   : ([ 1, 2, 1, 3, 1,-1], [ 6, 6, 6, 6, 8, 6]),
-            'A#m6'   : ([ 3, 2, 3, 1, 1,-1], [-1, 7, 7, 6,-1, 7]),
-            'A#m7-5' : ([-1, 2, 1, 2, 1,-1], [10,10,10, 8,-1,-1]),
-            'A#add9' : ([ 1, 1, 3, 3, 1,-1], [ 8, 6, 7, 8,-1,-1]),
-            'A#sus4' : ([ 1, 4, 3, 3, 1,-1], [ 6, 6, 8, 8, 8, 6]),
-            'A#7sus4': ([ 1, 4, 1, 3, 1,-1], [ 6, 6, 8, 6, 8, 6]),
-            'A#dim7' : ([ 0, 2, 0, 2, 1,-1], [-1, 5, 6, 5,-1, 6]),
-
-            'BM'     : ([ 2, 4, 4, 4, 2,-1], [ 7, 7, 8, 9, 9, 7]),
-            'BM7'    : ([ 2, 4, 3, 4, 2,-1], [-1, 7, 8, 8,-1, 7]),
-            'B7'     : ([ 2, 0, 2, 1, 2,-1], [ 7, 7, 8, 7, 9, 7]),
-            'B6'     : ([ 4, 4, 4, 4, 2,-1], [ 7, 9, 8, 9,-1,-1]),
-            'Baug'   : ([-1, 0, 0, 1, 2,-1], [ 7, 8, 8, 9,-1,-1]),
-            'Bm'     : ([ 2, 3, 4, 4, 2,-1], [ 7, 7, 7, 9, 9, 7]),
-            'BmM7'   : ([ 2, 3, 3, 4, 2,-1], [ 7, 7, 7, 8, 9, 7]),
-            'Bm7'    : ([ 2, 3, 2, 4, 2,-1], [ 7, 7, 7, 7, 9, 7]),
-            'Bm6'    : ([ 3, 0, 2, 0, 3,-1], [10, 9,11, 9,-1,-1]),
-            'Bm7-5'  : ([-1, 3, 2, 3, 2,-1], [11,11,11, 9,-1,-1]),
-            'Badd9'  : ([ 1, 1, 3, 3, 1,-1], [ 9, 7, 8, 9,-1,-1]),
-            'Bsus4'  : ([ 2, 5, 4, 4, 2,-1], [ 7, 7, 9, 9, 9, 7]),
-            'B7sus4' : ([ 2, 5, 2, 4, 2,-1], [ 7, 7, 9, 7, 9, 7]),
-            'Bdim7'  : ([-1, 3, 1, 3, 2,-1], [-1, 6, 7, 6,-1, 7])
-        }
+        #Chord   : LO:1  2  3  4  5  6  HI:1  2  3  4  5  6				# Strings
+        #  {'CM' : ([ 0, 1, 0, 2, 3,-1], [ 3, 5, 5, 5, 3,-1]),...}		# Fret number to press (-1 is not to play it)
+        self.CHORD_STRUCTURE = None
+        with open('SYNTH/MIDIFILE/chords.json', 'r') as f:
+            self.CHORD_STRUCTURE = json.load(f)
 
         self.PARAM_ALL = -1
         self.PARAM_GUITAR_PROGRAM = 0
@@ -854,6 +680,14 @@ class Guitar_class:
                 {'ROOT': 2, 'CHORD': 5, 'POSITION': 1, 'SCALE': 4}		# Dm High
             ]
 
+        # Preset chord set files
+        self._chord_file_num = -1
+        self._chord_files = []
+        with open('SYNTH/CHORD/list.json', 'r') as f:
+            self._chord_files = json.load(f)
+
+        print(self._chord_files)
+
         # Device aliases for play mode
         input_device.device_alias('GUITAR_CHORD_BANK', 'BUTTON_1')		# Chord set bank
         input_device.device_alias('GUITAR_CHORD1', 'BUTTON_2')
@@ -869,13 +703,14 @@ class Guitar_class:
         input_device.device_alias('GUITAR_CHORD',      'BUTTON_3')
         input_device.device_alias('GUITAR_POSITION',   'BUTTON_4')
         input_device.device_alias('GUITAR_OCTAVE',     'BUTTON_5')
-        input_device.device_alias('GUITAR_CAPOTASTO',  'BUTTON_6')
+        input_device.device_alias('GUITAR_CHORD_FILE', 'BUTTON_6')
         input_device.device_alias('GUITAR_INSTRUMENT', 'BUTTON_7')
 
         # Device aliases for settings mode
         input_device.device_alias('GUITAR_BASE_VOLUME',      'BUTTON_2')
         input_device.device_alias('GUITAR_VELOCITY_CURVE',   'BUTTON_3')
         input_device.device_alias('GUITAR_PITCH_BEND_RANGE', 'BUTTON_4')
+        input_device.device_alias('GUITAR_CAPOTASTO',        'BUTTON_5')
 
     def setup(self):
         display.fill(0)
@@ -956,6 +791,39 @@ class Guitar_class:
             self._chord_on_button[button]['SCALE'] = scale % 9
         
         return self._chord_on_button[button]
+
+    def chord_file(self, file_num=None):
+        if file_num is None or len(self._chord_files) <= 0:
+            return self._chord_file_num
+
+        try:
+            self._chord_file_num = file_num % len(self._chord_files)
+            with open('SYNTH/CHORD/' + self._chord_files[self._chord_file_num][0], 'r') as f:
+                json_data = json.load(f)
+
+            self._chord_files[self._chord_file_num][1] = json_data['NAME']
+            cd = -1
+            for chord in json_data['CHORDS']:
+                cd = cd + 1
+                
+                data = chord[0]
+                index = self.PARAM_GUITAR_ROOTs.index(data) if data in self.PARAM_GUITAR_ROOTs else 0
+                self._chord_on_button[cd]['ROOT']     = index
+
+                data = 'M' if len(chord[1]) == 0 else chord[1]
+                index = self.PARAM_GUITAR_CHORDs.index(data) if data in self.PARAM_GUITAR_CHORDs else 0
+                self._chord_on_button[cd]['CHORD']    = index
+
+                data = 'LOW' if len(chord[1]) == 0 else chord[1]
+                self._chord_on_button[cd]['POSITION'] = 1 if chord[2] == 'HIGH' else 0
+                
+                self._chord_on_button[cd]['SCALE']    = chord[3]
+                        
+            return self._chord_file_num
+
+        except Exception as e:
+          print(e, self._chord_files[self._chord_file_num][0])
+          return self._chord_file_num
 
     def pitch_bend_range(self, bend_range=None):
         if bend_range is not None:
@@ -1082,6 +950,8 @@ class Guitar_class:
         if param == self.PARAM_ALL:
             self._display.show_message('--GUITAR SETTINGS--', 0, 0, color)
             self._display.show_message('BUTTN: ' + str(self._chord_on_button_number + 1), 0, 9, color)
+            index = self.chord_file()
+            self._display.show_message('FILE : ' + self._chord_files[index][1] if index >= 0 else '---', 0, 36, color)
             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
             self._display.show_message('CHORD: ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 18, color)
@@ -1091,10 +961,7 @@ class Guitar_class:
 
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_OCTAVE:
             self._display.show_message('OCTAV: ' + str(self.scale_number()), 0, 27, color)
-
-        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CAPOTASTO:
-            self._display.show_message('CAPO : {:+d}'.format(self.capotasto()), 0, 36, color)
-            
+             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
             self._display.show_message('INST : ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 45, color)
 
@@ -1106,6 +973,9 @@ class Guitar_class:
             self._display.show_message('OFFSET VELOCITY : {:d}'.format(self.offset_velocity()), 0, 9, color)
             self._display.show_message('VELOCITY CURVE  : {:3.1f}'.format(adc0.velocity_curve()), 0, 18, color)
             self._display.show_message('PITCH BEND RANGE:{:+d}'.format(self.pitch_bend_range()), 0, 27, color)
+
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CAPOTASTO:
+            self._display.show_message('CAPOTASTO FRETS :{:+d}'.format(self.capotasto()), 0, 36, color)
 
         self._display.show()
 
@@ -1249,11 +1119,11 @@ class Guitar_class:
                 self.set_chord_on_button(current_button)
                 self.show_info_settings(self.PARAM_ALL, 1)
         
-            if input_device.device_info('GUITAR_CAPOTASTO') == False:
-                print('GUITAR_CAPOTASTO')
-                self.capotasto(self.capotasto() + 1)
-                self.show_info_settings(self.PARAM_GUITAR_CAPOTASTO, 1)
-        
+            if input_device.device_info('GUITAR_CHORD_FILE') == False:
+                print('CHORD_FILE')
+                self.chord_file(self.chord_file() + 1)
+                self.show_info_settings(self.PARAM_ALL, 1)
+       
             if input_device.device_info('GUITAR_INSTRUMENT') == False:
                 print('GUITAR_INSTRUMENT')
                 self.program_number(self.program_number()[0] + 1)
@@ -1282,6 +1152,11 @@ class Guitar_class:
                 self.pitch_bend_range(self.pitch_bend_range() + 1)
                 synth.set_pitch_bend_range(self.pitch_bend_range(), 0)
                 self.show_info_configs(self.PARAM_ALL, 1)
+        
+            elif input_device.device_info('GUITAR_CAPOTASTO') == False:
+                print('GUITAR_CAPOTASTO')
+                self.capotasto(self.capotasto() + 1)
+                self.show_info_configs(self.PARAM_GUITAR_CAPOTASTO, 1)
 
         except Exception as e:
             print('EXCEPTION: ', e)
