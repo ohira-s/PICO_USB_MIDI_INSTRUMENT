@@ -1147,12 +1147,12 @@ class Guitar_class:
                 for nt in notes_in_chord:
                     if nt >= 0:
                         synth.set_note_on(nt + capo, velocity, channel)
-##                        synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+                        synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
                         count_nt = count_nt + 1
                         sleep(0.005)
 
-###                if count_nt % 2 == 1:											# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
-###                    synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+                if count_nt % 2 == 1:											# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+                    synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
             # Notes in chord off
             else:
