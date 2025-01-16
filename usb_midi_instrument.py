@@ -634,15 +634,21 @@ class Guitar_class:
     def __init__(self, display_obj):
         self._display = display_obj
 
+        # Note sign like A#
         self.PARAM_GUITAR_ROOTs = synth._note_key
-        self.PARAM_GUITAR_CHORDs = ['M', 'M7', '7', '6', 'aug', 'm', 'mM7', 'm7', 'm6', 'm7-5', 'add9', 'sus4', '7sus4', 'dim7']
-        self.GUITAR_STRINGS_OPEN = [16,11, 7, 2, -3, -8]	# 1st String: E, B, G, D, A, E: 6th String
+#        self.PARAM_GUITAR_CHORDs = ['M', 'M7', '7', '6', 'aug', 'm', 'mM7', 'm7', 'm6', 'm7-5', 'add9', 'sus4', '7sus4', 'dim7']
+#        self.GUITAR_STRINGS_OPEN = [16,11, 7, 2, -3, -8]	# 1st String: E, B, G, D, A, E: 6th String
 
         #Chord   : LO:1  2  3  4  5  6  HI:1  2  3  4  5  6				# Strings
         #  {'CM' : ([ 0, 1, 0, 2, 3,-1], [ 3, 5, 5, 5, 3,-1]),...}		# Fret number to press (-1 is not to play it)
+        self.PARAM_GUITAR_CHORDs = None
+        self.GUITAR_STRINGS_OPEN = None
         self.CHORD_STRUCTURE = None
         with open('SYNTH/MIDIFILE/chords.json', 'r') as f:
-            self.CHORD_STRUCTURE = json.load(f)
+            data = json.load(f)
+            self.PARAM_GUITAR_CHORDs = data['CHORDS']				# M, M7, ...
+            self.GUITAR_STRINGS_OPEN = data['STRING_NOTES']			# Note offset of Strings [1..6] opened (B=-1,C=0,C#=1)
+            self.CHORD_STRUCTURE = data['CHORD_DEFINITIONS']		# Positions to press frets for each chord
 
         self.PARAM_ALL = -1
         self.PARAM_GUITAR_PROGRAM = 0
@@ -867,7 +873,11 @@ class Guitar_class:
             return self._music_num
 
         try:
+            if file_num < 0:
+                file_num = -1
+                
             self._music_num = file_num % len(self._music_list)
+            print("MUSIC FILE:", file_num, len(self._music_list), self._music_num)
             with open('SYNTH/MUSIC/' + self._music_list[self._music_num][0], 'r') as f:
                 json_data = json.load(f)
 
