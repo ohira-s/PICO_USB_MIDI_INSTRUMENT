@@ -826,6 +826,7 @@ class Guitar_class:
 
         try:
             self._chord_file_num = file_num % len(self._chord_files)
+
             with open('SYNTH/CHORD/' + self._chord_files[self._chord_file_num][0], 'r') as f:
                 json_data = json.load(f)
 
@@ -976,16 +977,9 @@ class Guitar_class:
             chord_position = self.chord_position()
             
         (root_name, chord_name) = self.chord_name(chord_position, root, chord, scale)
-        
-        # Simple chord
-        if self.value_guitar_on_note < 0:
-            notes = []
-            
-        # A chord with on-note like C on D
-        else:
-            notes = [self.value_guitar_on_note + (self._scale_number + 1) * 12]
             
 #        print('CHORD NAME: ', chord_name, self.CHORD_STRUCTURE[chord_name][chord_position])
+        notes = []
         fret_map = self.CHORD_STRUCTURE[chord_name][chord_position]
         for strings in list(range(6)):
             note = self.guitar_string_note(strings, fret_map[strings])
@@ -993,6 +987,14 @@ class Guitar_class:
                 notes.append(note + (self._scale_number + 1) * 12)
             else:
                 notes.append(-1)
+        
+        # Simple chord
+        if self.value_guitar_on_note < 0:
+            notes.append(-1)
+            
+        # A chord with on-note like C on D
+        else:
+            notes.append(self.value_guitar_on_note + (self._scale_number + 1) * 12)
             
         return notes
 
@@ -1010,8 +1012,14 @@ class Guitar_class:
 
                 if i == 3:
                     x = 64
+                
+                if button_data['ON_NOTE'] >= 0:
+                    on_note = ' on ' + self.PARAM_GUITAR_ROOTs[button_data['ON_NOTE']]
                     
-                self._display.show_message(chord_name + ' ' + ('L' if button_data['POSITION'] == 0 else 'H'), x, y + (i % 3) * 9, color)
+                else:
+                    on_note = ''
+                    
+                self._display.show_message(chord_name + ' ' + ('L' if button_data['POSITION'] == 0 else 'H') + on_note, x, y + (i % 3) * 9, color)
                 
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
             self._display.show_message(self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 18, color)
