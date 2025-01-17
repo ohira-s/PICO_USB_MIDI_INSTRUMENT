@@ -24,7 +24,7 @@
 5) MIDI音源の電源を入れます。MIDI音源からUSBケーブルで電源が供給されると、Pico Guitarが起動してOLED画面に「**PicoGuitar**」と表示されます。<br/>
 6) OLED画面が「**---GUITAR PLAY---**」という演奏用画面になると演奏できます。<br/>
 <br/>
-　この画像は、Unit-SYNTH / Unit-MIDIというGM音源シンセモジュールをPICOで制御している自作のUSB MIDI音源と接続したものです。
+　この画像は、Unit-SYNTH / Unit-MIDIというGM音源シンセモジュールをPICOで制御している自作のUSB MIDI音源と接続したものです。<br/>
 ![connection.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/connection.jpg)
 
 ## 5. コード演奏モード
