@@ -1,5 +1,4 @@
 # Pico Guitar User's Manual
-![pico_guitar.jpg](https://boostnote.io/api/teams/3znnx6X1E/files/c4995b6fc05fd2a9d902045e42103c8c53595cf15126ab403d2f20821d800273-pico_guitar.jpg)
 ![pico_guitar.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/pico_guitar.jpg)
 
 ## 1. 機能
@@ -7,7 +6,7 @@
  　押しボタンスイッチにコードを割り当てておくことで、スイッチを押してギターの弦に相当するパッドを押すことでギターをコード演奏しているようにUSB MIDI音源にMIDIメッセージを送信できます。
 
 ## 2. 外観
-![picoguitar_top_look.png](https://boostnote.io/api/teams/3znnx6X1E/files/f36faef501c19f63ab20ac735c750a1004ad7eda3352a57ff9a48f17543cea4b-picoguitar_top_look.png)
+![picoguitar_top_look.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_top_look.png)
 
 1) 8個の押しボタンスイッチ（S1〜S8）でコードを選んだり、各種設定を行います。<br/>
 2) 8個のタッチパッド（8 Pads）でギターの様に演奏します。<br/>
@@ -26,11 +25,11 @@
 6) OLED画面が「**---GUITAR PLAY---**」という演奏用画面になると演奏できます。<br/>
 <br/>
 　この画像は、Unit-SYNTH / Unit-MIDIというGM音源シンセモジュールをPICOで制御している自作のUSB MIDI音源と接続したものです。
-![connection.jpg](https://boostnote.io/api/teams/3znnx6X1E/files/078132a378e84a84dfdc063b187f586c4017f7d852e461892c5600dad0015ed4-connection.jpg)
+![connection.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/connection.jpg)
 
 ## 5. コード演奏モード
 　起動直後はコード演奏画面になっています。このモードではギターのコード演奏ができます。<br/>
-![picoguitar_play_chord.png](https://boostnote.io/api/teams/3znnx6X1E/files/620a794a23eb86e86cf8a38955500927298ace548c6ec012ab804eebd47921ed-picoguitar_play_chord.png)
+![picoguitar_play_chord.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_play_chord.png)
 ### 5-1. Chord Selectors / Chord Page
 　6個のスイッチでコードを選択します。各スイッチのコードはコード設定モードで割り当てます。<br/>
 　スイッチは6個ですが、1個のスイッチに2つのコードを割り当てることができます。Chord Pageスイッチを押すと、Chord Selectorsのスイッチに割り当てられている2つのコードの入れ替えができます。6個のスイッチの1ページ目と2ページ目を切り替えるイメージです。<br/>
@@ -41,7 +40,7 @@
 
 ### 5-3. Display
 　コード演奏時の画面は以下のようになっています。<br/>
-![chord_play.jpg](https://boostnote.io/api/teams/3znnx6X1E/files/6d592f9d211124b143ee026d9362fd5aa7d07029ecd8a35b56fee2e8394e4c67-chord_play.jpg)
+![chord_play.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/chord_play.jpg)
 
 ・A aug L +5<br/>
 　選択されているベース音(A)、コード(aug)、ロー／ハイコード(L)、カポタスト位置(+5)が表示されています。<br/><br/>
@@ -60,7 +59,7 @@
 
 ## 6. コード設定モード
 　コード設定モードでは、コード演奏モードのChord Selectorsの6個のスイッチにコードを割り当てることができます。<br/>
-![picoguitar_guitar_settings.png](https://boostnote.io/api/teams/3znnx6X1E/files/1e26c895e272d79ae82aeda3f996bcaf166b3c04c23410d4dd3cdd92e04cb9c6-picoguitar_guitar_settings.png)
+![picoguitar_guitar_settings.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_guitar_settings.png)
 
 ### 6-1. Chord Switch Selector
 　コードを割り当てるスイッチの番号を選択します。押すたびに番号が1〜12に変化し、12で押すと1に戻ります。<br/>
@@ -91,7 +90,7 @@
 
 ### 6-9. Display
 　コード設定時の画面は以下のようになっています。<br/>
-![chord_settings.jpg](https://boostnote.io/api/teams/3znnx6X1E/files/1889a451d2418d7889217e8b8bcba4a063a56884b3208c0ebe07c148b8c62985-chord_settings.jpg)
+![chord_settings.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/chord_settings.jpg)
 ・BUTTN:<br/>
 　Chord Switch Selectorで選択されたChord Selectorsスイッチの番号が表示されています。このスイッチにコードを設定することになります。<br/><br/>
 ・CHORD:<br/>
@@ -109,7 +108,7 @@
 
 ## 7. コンフィグレーションモード
 　コンフィグレーションモードでは、演奏の全体的な設定ができます。<br/>
-![picoguitar_guitar_configs.png](https://boostnote.io/api/teams/3znnx6X1E/files/cce04805207d320d59de6b418fe1641d0706544dc3f614422e9b8492aa9ab1ba-picoguitar_guitar_configs.png)
+![picoguitar_guitar_configs.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_guitar_configs.png)
 
 ### 7-1. Velocity Offset
 　8個のパッドは圧力を検知して、MIDI NOTE-ONのベロシティを変更して演奏する音の大きさを変えています。このスイッチを押すとベロシティの下限を変更できます。ベロシティの範囲が大きくて弱い音の音量が小さすぎるといった場合は、この値を大きくすることで解消できます。<br/>
@@ -131,7 +130,7 @@
 
 ### 7-6. Display
 　コンフィグレーション時の画面は以下のようになっています。<br/>
-![configs.jpg](https://boostnote.io/api/teams/3znnx6X1E/files/866c710cba5cd1f9329ad5603206f6956bc21637474dbe136d69335e307f3792-configs.jpg)
+![configs.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/configs.jpg)
 ・OFFSET VELOCITY:<br/>
 　指定されたベロシティの下限値が表示されています。<br/><br/>
 ・VELOCITY CURVE:<br/>
@@ -146,7 +145,7 @@
 
 ## 8. コード譜演奏モード
 　コード譜演奏モードでは、あらかじめ保存されているコード譜を使ってスイッチを押すだけでコードが切り替わって曲を演奏できます。コード譜は複数保存可能です（個数制限はありません。PICOのメモリが許す範囲で保存できます）<br/>
-![picoguitar_play_music.png](https://boostnote.io/api/teams/3znnx6X1E/files/7f49ba116b0fb23436bd23a086fb19306019d32fd91359bb0eb1d243aca2e104-picoguitar_play_music.png)
+![picoguitar_play_music.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_play_music.png)
 
 ### 8-1. Previous File
 　1つ前のコード譜ファイルを選択します。演奏対象のコードはコード譜の先頭になります。<br/>
@@ -173,7 +172,7 @@
 
 ### 8-7. Display
 　コード譜演奏時の画面は以下のようになっています。<br/>
-![music_player.jpg](https://boostnote.io/api/teams/3znnx6X1E/files/5b08d4e27e7575978217f4c28e07e14e9793514a5bb6c00413077438446fa2bb-music_player.jpg)
+![music_player.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/music_player.jpg)
 ・MUSIC:<br/>
 　選択されているコード譜のタイトルが表示されています。<br/><br/>
 ・PLAY:<br/>
