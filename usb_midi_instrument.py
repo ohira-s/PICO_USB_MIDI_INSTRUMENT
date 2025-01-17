@@ -53,6 +53,8 @@
 #            Load chord set from file.
 #            Music player.
 #            On note chord is available.
+#     1.0.2: 01/17/2025
+#            Improve the on-note chord generation.
 #########################################################################
 
 import asyncio
@@ -989,14 +991,22 @@ class Guitar_class:
         (root_name, chord_name) = self.chord_name(chord_position, root, chord, scale)
             
 #        print('CHORD NAME: ', chord_name, self.CHORD_STRUCTURE[chord_name][chord_position])
+        root_mod = -1 if self.value_guitar_on_note < 0 else self.PARAM_GUITAR_ROOTs.index(root_name) % 12
         notes = []
         fret_map = self.CHORD_STRUCTURE[chord_name][chord_position]
-        for strings in list(range(6)):
+#        for strings in list(range(6)):
+        for strings in list(range(5, -1, -1)):
             note = self.guitar_string_note(strings, fret_map[strings])
             if note is not None:
-                notes.append(note + (self._scale_number + 1) * 12)
+                # Replace the root note with the on-chord note
+                if note % 12 == root_mod:
+                    notes.insert(0, -1)
+                    root_mod = -1
+                    print('IGNORE ROOT for ON-NOTE:', note + (self._scale_number + 1) * 12, self.value_guitar_on_note)
+                else:
+                    notes.insert(0, note + (self._scale_number + 1) * 12)
             else:
-                notes.append(-1)
+                notes.insert(0, -1)
         
         # Simple chord
         if self.value_guitar_on_note < 0:
@@ -1004,7 +1014,12 @@ class Guitar_class:
             
         # A chord with on-note like C on D
         else:
-            notes.append(self.value_guitar_on_note + (self._scale_number + 1) * 12)
+            # Make a base note
+            on_note = self.value_guitar_on_note + (self._scale_number + 1) * 12
+            if on_note in notes:
+                notes.append(self.value_guitar_on_note + self._scale_number * 12)
+            else:
+                notes.append(self.value_guitar_on_note + (self._scale_number + 1) * 12)
             
         return notes
 
@@ -1048,7 +1063,7 @@ class Guitar_class:
             else:
                 st = '-- '
                 
-            print('ON NOTE:', self.value_guitar_on_note, '/' + st + '/')
+#            print('ON NOTE:', self.value_guitar_on_note, '/' + st + '/')
             for y in list(range(3)):
                 self._display.show_message(st[y], 72, 9 + y * 9, color)
                 
