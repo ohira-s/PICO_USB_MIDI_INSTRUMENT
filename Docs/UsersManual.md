@@ -1,5 +1,6 @@
 # Pico Guitar User's Manual
 ![pico_guitar.jpg](https://boostnote.io/api/teams/3znnx6X1E/files/c4995b6fc05fd2a9d902045e42103c8c53595cf15126ab403d2f20821d800273-pico_guitar.jpg)
+![pico_guitar.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/pico_guitar.jpg)
 
 ## 1. 機能
 　Pico GuitarはUSB MIDIデバイスとして動作するMIDIコントローラーです。<br/>
