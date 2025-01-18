@@ -58,6 +58,7 @@
 #     1.0.3: 01/18/2025
 #            Instrument selector moved to the config mode.
 #            On-chord selector is available in the chord settings mode.
+#            Remove all timing control codes to keep MIDI-SEND duration.
 #########################################################################
 
 import asyncio
@@ -108,7 +109,7 @@ async def catch_pin_transitions(pin, pin_name, callback_pressed=None, callback_r
 
             # Gives away process time to the other tasks.
             # If there is no task, let give back process time to me.
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(0.01)
 
 
 ##########################################
@@ -120,7 +121,6 @@ async def catch_adc_voltage(adc):
 
         # Gives away process time to the other tasks.
         # If there is no task, let give back process time to me.
-#        await asyncio.sleep(0.01)
         await asyncio.sleep(0.0)
 
 
@@ -239,7 +239,6 @@ class ADC_Device_class:
         self._4051_selectors[0].value =  analog_channel & 0x1
         self._4051_selectors[1].value = (analog_channel & 0x2) >> 1
         self._4051_selectors[2].value = (analog_channel & 0x4) >> 2
-#        sleep(0.01)
         voltage = self._adc.value * 5.0 / 65535
         return voltage
 
