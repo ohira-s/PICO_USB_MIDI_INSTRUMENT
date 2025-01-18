@@ -26,10 +26,12 @@
 6) OLED画面が「**---GUITAR PLAY---**」という演奏用画面になると演奏できます。<br/>
 <br/>
 　この画像は、Unit-SYNTH / Unit-MIDIというGM音源シンセモジュールをPICOで制御している自作のUSB MIDI音源と接続したものです。<br/>
+ 
 ![connection.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/connection.jpg)
 <br/>
 ## 5. コード演奏モード
 　起動直後はコード演奏画面になっています。このモードではギターのコード演奏ができます。<br/>
+ 
 ![picoguitar_play_chord.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_play_chord.png)
 ### 5-1. Chord Selectors / Chord Page
 　6個のスイッチでコードを選択します。各スイッチのコードはコード設定モードで割り当てます。<br/>
