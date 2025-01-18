@@ -17,6 +17,7 @@
 　Pico GuitarのほかにUSBホストデバイスになるUSB MIDI音源が必要です。電源もUSBホストから供給される必要があります。
 
 ## 4. 接続〜起動
+![splash.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/splash.jpg)
 1) Pico Guitarを用意します。<br/>
 2) USBホストとなるUSB MIDI音源を用意します。<br/>
 3) Pico GuitarとMIDI音源を接続するUSBケーブルを用意します。Pico Guitar側はMicro USB-Bオスです。<br/>
@@ -42,12 +43,13 @@
 　コード演奏時の画面は以下のようになっています。<br/>
 ![chord_play.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/chord_play.jpg)
 
-・A aug L +5<br/>
-　選択されているベース音(A)、コード(aug)、ロー／ハイコード(L)、カポタスト位置(+5)が表示されています。<br/><br/>
-・Aco GT (nylo<br/>
+・A M L +0<br/>
+　選択されているベース音(A)、コード(M=major)、ロー／ハイコード(L)、カポタスト位置(+0=カポタストなし)が表示されています。<br/>
+ 　オンコード（分数コード）A/Cで、ハイコード、カポタスト位置2フレット目の場合は「A M H/C +2」のように表示されます。 <br/><br/>
+・Banjo<br/>
 　演奏するGM音源の楽器名が表示されています。<br/><br/>
-・CM L<br/>
-　画面左下の3行は6個のChord Selectorsスイッチに割り当てられているコードが表示されています。CM LはCメジャーのローコード、Aaug L on BはAaugのローコードでオンコードでベース音をBにしたコードを表しています。<br/>
+・CM L, AM L/C, ...<br/>
+　画面左下の3行は6個のChord Selectorsスイッチに割り当てられているコードが表示されています。CM LはCメジャーのローコード、AM L/CはAメジャーのローコードでオンコードでベース音をCにしたコードを表しています。<br/>
 　Chord Pageでコード設定のページを切り替えると、この表示も変化します。<br/><br/>
 ・画面右上のノート表示<br/>
 　縦書きで音程が表示されています。右の6列がギターの6弦に相当し、右から高音の1弦になっています。画面のコードは高音側の4弦をF5, C#5, A4, F4で発音することを表しています。<br/>
@@ -74,16 +76,15 @@
 ### 6-4. Low/High Selector
 　ローコード、ハイコードの切り替えをします。スイッチを押すたびにLow, Highが切り替わります。<br/>
 
-### 6-5. Octave Selector
+### 6-5. On-chord Selector
+　ベース音の代わりとする音程を指定します。押すたびにC,C##,...と変化し、Bの次は空欄となってオンコードとしないことになります。<br/>
+
+### 6-6. Octave Selector
 　1〜9の範囲でオクターブを切り替えられます。初期値は4です。9で押すと1に戻ります。<br/>
 
-### 6-6. Chord Set File Selector
+### 6-7. Chord Set File Selector
 　曲調などに合ったコード進行を構成するコード群をあらかじめ定義した設定ファイルがあると、そのファイルを指定してChord Selectorsスイッチに一括してコードを割り当てることができます（設定ファイルの個数制限はありません。PICOのメモリが許す範囲で保存できます）<br/>
 　スイッチを押すたびに設定ファイルが切り替わり、切り替わった時点でChord Selectorsのスイッチへのコード割り当ても変更されます。<br/>
-
-### 6-7. Instrument Selector
-　MIDI GM音源内の楽器を変更できます。スイッチを押すたびに切り替わります。各種ギターとシタールなどの弦楽器系から選択できます。<br/>
-　選択した時点でMIDIのプログラムチェンジが送信され、音源のプログラムが切り替わります（その後、音源側でプログラムを変更した場合は、その音で演奏されます）
  
 ### 6-8. 8 Pads
  　設定中のコードは8個のパッドを指で押して演奏できます。<br/>
@@ -94,14 +95,11 @@
 ・BUTTN:<br/>
 　Chord Switch Selectorで選択されたChord Selectorsスイッチの番号が表示されています。このスイッチにコードを設定することになります。<br/><br/>
 ・CHORD:<br/>
-　Root Selector, Chord Selector, Low/High Selectorで指定されたコード名が表示されています。<br/>
-　残念ながらここではオンコード（分数コード）を設定することはできません。オンコードはコード設定ファイルを使って設定します。<br/><br/>
+　Root Selector、Chord Selector、Low/High Selector、On-chord Selectorで指定されたコード名が表示されています。<br/><br/>
 ・OCTAV:<br/>
 　設定されているオクターブが表示されます。通常は4です。<br/><br/>
 ・FILE:<br/>
 　選択されたコード設定ファイルのタイトルが表示されています。<br/><br/>
-・INST:<br/>
-　選択されたGM音源楽器名が表示されています。<br/>
 
 ### 6-10. Mode Change
 　このスイッチを押すとコンフィグレーションモードに移行します。<br/>
@@ -124,11 +122,14 @@
 ### 7-4. Capotasto
 　カポタストを付けるフレットの位置を設定できます。-12〜+12の範囲で変更できます。0でカポタストなしです。実際のギターでマイナスのカポタストは付けられませんが、Pico Guitarでは可能としました。<br/>
 　コード設定のOctave Selectorではオクターブ単位での音程を設定できましたが、カポタストではさらに半音単位で音程を変更できます。<br/>
- 
-### 7-5. 8 Pads
+
+### 7-5. Instrument Selector
+　MIDI GM音源内の楽器を変更できます。スイッチを押すたびに切り替わります。各種ギターとシタールなどの弦楽器系から選択できます。<br/>
+　選択した時点でMIDIのプログラムチェンジが送信され、音源のプログラムが切り替わります（その後、音源側でプログラムを変更した場合は、その音で演奏されます）
+### 7-6. 8 Pads
  　設定中のコードは8個のパッドを指で押して演奏できます。<br/>
 
-### 7-6. Display
+### 7-7. Display
 　コンフィグレーション時の画面は以下のようになっています。<br/>
 ![configs.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/configs.jpg)
 ・OFFSET VELOCITY:<br/>
@@ -139,8 +140,10 @@
 　指定されたピッチベンドレンジの値が表示されています。<br/><br/>
 ・CAPOTASTO FRETS:<br/>
 　指定されたカポタストのフレット位置が表示されています。<br/>
+・INST:<br/>
+　選択されたGM音源楽器名が表示されています。<br/>
 
-### 7-7. Mode Change
+### 7-8. Mode Change
 　このスイッチを押すとコード譜演奏モードに移行します。<br/>
 
 ## 8. コード譜演奏モード
