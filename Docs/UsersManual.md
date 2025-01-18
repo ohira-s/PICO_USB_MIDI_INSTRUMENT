@@ -27,7 +27,6 @@
 <br/>
 　この画像は、Unit-SYNTH / Unit-MIDIというGM音源シンセモジュールをPICOで制御している自作のUSB MIDI音源と接続したものです。<br/>
 ![connection.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/connection.jpg)
-
 ## 5. コード演奏モード
 　起動直後はコード演奏画面になっています。このモードではギターのコード演奏ができます。<br/>
 ![picoguitar_play_chord.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_play_chord.png)
@@ -42,7 +41,7 @@
 ### 5-3. Display
 　コード演奏時の画面は以下のようになっています。<br/>
 ![chord_play.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/chord_play.jpg)
-
+<br/>
 ・A M L +0<br/>
 　選択されているベース音(A)、コード(M=major)、ロー／ハイコード(L)、カポタスト位置(+0=カポタストなし)が表示されています。<br/>
  　オンコード（分数コード）A/Cで、ハイコード、カポタスト位置2フレット目の場合は「A M H/C +2」のように表示されます。 <br/><br/>
@@ -92,6 +91,7 @@
 ### 6-9. Display
 　コード設定時の画面は以下のようになっています。<br/>
 ![chord_settings.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/chord_settings.jpg)
+<br/>
 ・BUTTN:<br/>
 　Chord Switch Selectorで選択されたChord Selectorsスイッチの番号が表示されています。このスイッチにコードを設定することになります。<br/><br/>
 ・CHORD:<br/>
@@ -132,6 +132,7 @@
 ### 7-7. Display
 　コンフィグレーション時の画面は以下のようになっています。<br/>
 ![configs.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/configs.jpg)
+<br/>
 ・OFFSET VELOCITY:<br/>
 　指定されたベロシティの下限値が表示されています。<br/><br/>
 ・VELOCITY CURVE:<br/>
@@ -176,6 +177,7 @@
 ### 8-7. Display
 　コード譜演奏時の画面は以下のようになっています。<br/>
 ![music_player.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/music_player.jpg)
+<br/>
 ・MUSIC:<br/>
 　選択されているコード譜のタイトルが表示されています。<br/><br/>
 ・PLAY:<br/>
