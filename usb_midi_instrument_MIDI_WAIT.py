@@ -79,7 +79,7 @@ from adafruit_midi.pitch_bend import PitchBend
 from adafruit_midi.program_change import ProgramChange
 
 import board
-#import supervisor
+import supervisor
 
 import adafruit_ssd1306			# for SSD1306 OLED Display
 
@@ -201,6 +201,24 @@ class OLED_SSD1306_class:
 ###############
 ### ADC class
 ###############
+_TICKS_PERIOD = const(1<<29)
+_TICKS_MAX = const(_TICKS_PERIOD-1)
+_TICKS_HALFPERIOD = const(_TICKS_PERIOD//2)
+
+def ticks_add(ticks, delta):
+    "Add a delta to a base number of ticks, performing wraparound at 2**29ms."
+    return (ticks + delta) % _TICKS_PERIOD
+
+def ticks_diff(ticks1, ticks2):
+    "Compute the signed difference between two ticks values, assuming that they are within 2**28 ticks"
+    diff = (ticks1 - ticks2) & _TICKS_MAX
+    diff = ((diff + _TICKS_HALFPERIOD) & _TICKS_MAX) - _TICKS_HALFPERIOD
+    return diff
+
+def ticks_less(ticks1, ticks2):
+    "Return true iff ticks1 is less than ticks2, assuming that they are within 2**28 ticks"
+    return ticks_diff(ticks1, ticks2) < 0
+
 class ADC_Device_class:
     def __init__(self, adc_pin, adc_name):
         self._adc = AnalogIn(adc_pin)
@@ -211,6 +229,7 @@ class ADC_Device_class:
 
         self._adc_name = adc_name
         self._note_on = [False] * 7				# 6 strings on guitar, and effector
+#SOS#        self._note_on_ticks = [-1] * 8			# 8 pads on UI (Piezo elements)
         self._play_chord = False
 #        self._voltage_gate = [(100.0,20.0)] * 8	 # for Piezo elements
         self._voltage_gate = [(400.0,200.0)] * 8		# for Resistor elements
@@ -244,6 +263,12 @@ class ADC_Device_class:
         return voltage
 
     def adc_handler(self):
+#SOS#        current_ticks = supervisor.ticks_ms()
+#SOS#        from_note_on = [-1] * 8
+#SOS#        for string in list(range(8)):
+#SOS#            if self._note_on_ticks[string] >= 0:
+#SOS#                from_note_on[string] = ticks_diff(current_ticks, self._note_on_ticks[string])
+
         # Get voltages guitar strings
         velo_curve = self.velocity_curve()
         velo_factor = math.pow(velo_curve, 5)
@@ -253,6 +278,37 @@ class ADC_Device_class:
             if voltage > 5000.0:
                 voltage = 5000.0
 
+            # Note on time out
+#SOS#            if from_note_on[string] >= 3000:
+#SOS#                print('AUTO NOTE OFF:', string, from_note_on[string])
+#SOS#                # Note a string off
+#SOS#                if string <= 5:
+#SOS#                    if self._note_on[string]:
+#SOS#                        self._note_on[string] = False
+#SOS#                        self._note_on_ticks[string] = -1
+#SOS#                        instrument_guitar.play_a_string(5 - string, 0)
+#SOS#                        self._adc_on[string] = False
+#SOS#                
+#SOS#                # Note a chord off
+#SOS#                elif string == 7:
+#SOS#                    if self._play_chord:
+#SOS#                        instrument_guitar.play_chord(False)
+#SOS#                        self._play_chord = False
+#SOS#                        self._note_on_ticks[string] = -1
+#SOS#                        self._adc_on[string] = False
+#SOS#
+#SOS#                # Finish pitch bend
+#SOS#                elif string == 6:
+#SOS#                    if self._note_on[string]:
+#SOS#                        self._note_on[string] = False
+#SOS#                        self._note_on_ticks[string] = -1
+#SOS#                        synth.set_pitch_bend( 8192, 0)
+#SOS#                        self._adc_on[string] = False                    
+#SOS#                        print('PITCH BEND off')
+#SOS#
+#SOS#            # Pad is released
+#SOS#            elif voltage <= self._voltage_gate[string][1]:
+
             # Pad is released
             if   voltage <= self._voltage_gate[string][1]:
 #                print('PAD RELEASED:', string, voltage)
@@ -260,6 +316,7 @@ class ADC_Device_class:
                 if string <= 5:
                     if self._note_on[string]:
                         self._note_on[string] = False
+#SOS#                        self._note_on_ticks[string] = -1
                         self._adc_on[string] = False
 ###                        instrument_guitar.play_a_string(5 - string, 0)
                 
@@ -267,6 +324,7 @@ class ADC_Device_class:
                 elif string == 7:
                     if self._play_chord:
                         self._play_chord = False
+#SOS#                        self._note_on_ticks[string] = -1
                         self._adc_on[string] = False
 ###                        instrument_guitar.play_chord(False)
 
@@ -274,6 +332,7 @@ class ADC_Device_class:
                 elif string == 6:
                     if self._note_on[string]:
                         self._note_on[string] = False
+#SOS#                        self._note_on_ticks[string] = -1
                         synth.set_pitch_bend( 8192, 0)
                         self._adc_on[string] = False                    
                         print('PITCH BEND off')
@@ -293,17 +352,20 @@ class ADC_Device_class:
                     if self._note_on[string]:
                         print('PLAY a STRING OFF:', 5 - string)
                         self._note_on[string] = False
+#SOS#                        self._note_on_ticks[string] = -1
                         self._adc_on[string] = False
 ###                        instrument_guitar.play_a_string(5 - string, 0)
 
                     # Pitch bend off
                     if self._note_on[6]:
                         self._note_on[6] = False
+#SOS#                        self._note_on_ticks[6] = -1
                         synth.set_pitch_bend( 8192, 0)
                         self._adc_on[6] = False                    
 
                     print('PLAY a STRING:', 5 - string, voltage, velocity)
                     self._note_on[string] = True
+#SOS#                    self._note_on_ticks[string] = current_ticks
                     chord_note = instrument_guitar.play_a_string(5 - string, velocity)
                     self._adc_on[string] = True
                     
@@ -313,17 +375,20 @@ class ADC_Device_class:
                         print('PLAY CHORD OFF')
 ###                        instrument_guitar.play_chord(False)
                         self._play_chord = False
+#SOS#                        self._note_on_ticks[string] = -1
                         self._adc_on[string] = False
 
                     # Pitch bend off
                     if self._note_on[6]:
                         self._note_on[6] = False
+#SOS#                        self._note_on_ticks[6] = -1
                         synth.set_pitch_bend( 8192, 0)
                         self._adc_on[6] = False                    
                         
                     print('PLAY CHORD:', voltage, velocity)
                     instrument_guitar.play_chord(True, velocity)
                     self._play_chord = True
+#SOS#                    self._note_on_ticks[string] = current_ticks
                     self._adc_on[string] = True
                     
                 # Pad 6
@@ -332,6 +397,7 @@ class ADC_Device_class:
 ##                    application.show_message('DEBUG:' + ('on' if application._DEBUG_MODE else 'off'), 0, 54, 1)
                     if self._note_on[string]:
                         self._note_on[string] = False
+#SOS#                        self._note_on_ticks[string] = -1
                         synth.set_pitch_bend( 8192, 0)
                         self._adc_on[string] = False                    
                         print('PITCH BEND OFF')
@@ -340,6 +406,7 @@ class ADC_Device_class:
                     print('PITCH BEND ON:', bend_velocity, voltage, velocity)
                     synth.set_pitch_bend(bend_velocity, 0)
                     self._note_on[string] = True
+#SOS#                    self._note_on_ticks[string] = current_ticks
                     self._adc_on[string] = True
 
 ################# End of ADC Class Definition #################
@@ -423,6 +490,8 @@ class USB_MIDI_Instrument_class:
         self.ControlChange_Chorus_Feedback = 59		# 0..127
         self.ControlChange_Chorus_Delay    = 60		# 0..127
 
+        self._midi_sent = -1
+
         self._note_key = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
         # USB MIDI device
@@ -466,6 +535,15 @@ class USB_MIDI_Instrument_class:
 
     # MIDI sends to USB as a USB device
     def midi_send(self, midi_msg, channel=0):
+        #SOS#
+#SOS#        if self._midi_sent >= 0:
+#SOS#            while ticks_diff(supervisor.ticks_ms(), self._midi_sent) <= 10:
+#SOS#                print('WAIT midi_send')
+#SOS#                sleep(0.001)
+#SOS#
+#SOS#        self._midi_sent = supervisor.ticks_ms()
+        #SOS#
+
         channel = channel % 16
         print('MIDI SEND:', midi_msg)
 #        print('INSTANCE:', isinstance(midi_msg, NoteOn), isinstance(midi_msg, NoteOff), self._send_note_on[channel])
