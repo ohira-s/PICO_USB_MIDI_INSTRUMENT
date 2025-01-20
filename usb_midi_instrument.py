@@ -1278,12 +1278,12 @@ class Guitar_class:
     def show_info_config1(self, param, color):
         if param == self.PARAM_ALL:
             self._display.show_message('--GUITAR CONFIG1--', 0, 0, color)
-            self._display.show_message('VELOCITY OFFSET : {:d}'.format(self.offset_velocity()), 0, 9, color)
-            self._display.show_message('VELOCITY CURVE  : {:3.1f}'.format(adc0.velocity_curve()), 0, 18, color)
-            self._display.show_message('PITCH BEND RANGE:{:+d}'.format(self.pitch_bend_range()), 0, 27, color)
-            self._display.show_message('CHORUS LEVEL    : {:d}'.format(self.chorus_level()), 0, 36, color)
-            self._display.show_message('CHORUS FEEDBACK : {:d}'.format(self.chorus_feedback()), 0, 45, color)
-            self._display.show_message('AFTER TOUCH ON  : {:3.1f}'.format(adc0.after_touch_counter() / 1000.0), 0, 54, color)
+            self._display.show_message('VELOC OFFSET: {:d}'.format(self.offset_velocity()), 0, 9, color)
+            self._display.show_message('VELOC CURVE : {:3.1f}'.format(adc0.velocity_curve()), 0, 18, color)
+            self._display.show_message('P-BEND RANGE:{:+d}'.format(self.pitch_bend_range()), 0, 27, color)
+            self._display.show_message('CHORUS LEVEL: {:d}'.format(self.chorus_level()), 0, 36, color)
+            self._display.show_message('CHORUS FBACK: {:d}'.format(self.chorus_feedback()), 0, 45, color)
+            self._display.show_message('AFT-TOUCH ON: {:3.1f}'.format(adc0.after_touch_counter() / 1000.0), 0, 54, color)
 
         self._display.show()
 
@@ -1292,7 +1292,7 @@ class Guitar_class:
             self._display.show_message('--GUITAR CONFIG2--', 0, 0, color)
             self._display.show_message('MIDI CHANNEL  : ' + str(self.midi_channel() + 1), 0, 9, color)
             self._display.show_message('PLAY DRUM     : ' + ('ON' if self.drum_mode() else 'OFF'), 0, 36, color)
-            self._display.show_message('DRUM: ' + self._drum_list[self.drum_file()][1], 0, 45, color)
+            self._display.show_message('DRUM: ' + ('---' if self.drum_file() < 0 else self._drum_list[self.drum_file()][1]), 0, 45, color)
 
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CAPOTASTO:
             self._display.show_message('CAPOTASTO FRET:{:+d}'.format(self.capotasto()), 0, 18, color)
