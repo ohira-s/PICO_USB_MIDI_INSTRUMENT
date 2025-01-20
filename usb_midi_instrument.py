@@ -91,7 +91,7 @@ import supervisor
 import adafruit_ssd1306			# for SSD1306 OLED Display
 
 from analogio import AnalogIn
-import math
+#import math
 
 
 ###############################################
@@ -276,12 +276,13 @@ class ADC_Device_class:
 
     def adc_handler(self):
         # Get voltages guitar strings
-        velo_curve = self.velocity_curve()
-        velo_factor = math.pow(velo_curve, 5)
+##        velo_curve = self.velocity_curve()
+##        velo_factor = math.pow(velo_curve, 5)
+        velo_factor = self.velocity_curve()
         for string in list(range(8)):
             voltage_raw = self.get_voltage(string)
-#            voltage = (math.pow(velo_curve, voltage) - 1) / velo_factor * 10000.0
-            voltage = voltage_raw * (voltage_raw/3.55) * (voltage_raw/3.55) / velo_factor * 1000000.0
+#            voltage = voltage_raw * (voltage_raw/3.55) * (voltage_raw/3.55) / velo_factor * 1000000.0
+            voltage = voltage_raw * (voltage_raw/velo_factor) * (voltage_raw/velo_factor) * 100000.0
             if voltage > 5000.0:
                 voltage = 5000.0
 
@@ -329,8 +330,8 @@ class ADC_Device_class:
 #                    self._on_counter[string] = 0
                     self._on_counter[string] = supervisor.ticks_ms()
 
-#                    if string == 5:
-#                        print('PAD PRESSED:', string, voltage_raw, voltage, velocity)
+##                    if string == 5:
+                    print('PAD PRESSED:', string, voltage_raw, voltage, velocity)
 
                     # Play a string
                     if string <= 5:
@@ -510,10 +511,11 @@ class USB_MIDI_Instrument_class:
                         return instrument.strip()
 
         except Exception as e:
-            application.show_message('GM LIST:' + e)
-            sleep(5.0)
-            display.clear()
-            application.show_info()
+            pass
+#            application.show_message('GM LIST:' + e)
+#            sleep(5.0)
+#            display.clear()
+#            application.show_info()
 
         return '???'
 
@@ -536,6 +538,7 @@ class USB_MIDI_Instrument_class:
         if isinstance(midi_msg, NoteOn):
             if midi_msg.note in self._send_note_on[channel]:
                 self._usb_midi[channel].send(NoteOff(midi_msg.note, channel=channel))
+                sleep(0.005)
 #                print('MIDI NOTE OFF:', midi_msg.note)
 #                print('NOTE ON CH-a:', channel, self._send_note_on[channel])
 
@@ -1069,7 +1072,7 @@ class Guitar_class:
 
         if chord is None:
             chord = self.value_guitar_chord
-            chord = chord % 14							# SOS DEBUG
+#            chord = chord % 14							# SOS DEBUG
         
 #        print('root, chord=', root, chord)
         root_name = self.PARAM_GUITAR_ROOTs[root % 12]
@@ -1149,47 +1152,43 @@ class Guitar_class:
 
 
     def play_chord(self, play=True, velocity=127, channel=None):
-        try:
-            capo = self.capotasto()
-            notes_in_chord = self.chord_notes()        
-            if channel is None:
-                channel = self.midi_channel()
+        capo = self.capotasto()
+        notes_in_chord = self.chord_notes()        
+        if channel is None:
+            channel = self.midi_channel()
 
-            # Play a chord selected
-            if play:
-#                print('CHORD NOTEs ON : ', notes_in_chord)
-                velocity = velocity + self.offset_velocity()
-                if velocity > 127:
-                    velocity = 127
-                    
-                count_nt = 0
-                for nt in notes_in_chord:
-                    if nt >= 0:
-                        synth.set_note_on(nt + capo, velocity, channel)
-                        synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
-                        count_nt = count_nt + 1
-                        sleep(0.005)
-
-                if count_nt % 2 == 1:											# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+        # Play a chord selected
+        if play:
+#            print('CHORD NOTEs ON : ', notes_in_chord)
+            velocity = velocity + self.offset_velocity()
+            if velocity > 127:
+                velocity = 127
+                
+            count_nt = 0
+            for nt in notes_in_chord:
+                if nt >= 0:
+                    synth.set_note_on(nt + capo, velocity, channel)
                     synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+                    count_nt = count_nt + 1
+                    sleep(0.005)
 
-            # Notes in chord off
-            else:
-                # Notes off
-#                print('CHORD NOTEs OFF: ', notes_in_chord)
-                count_nt = 0
-                for nt in notes_in_chord:
-                    if nt >= 0:
-                        synth.set_note_off(nt + capo, 0)
-                        synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
-                        count_nt = count_nt + 1
-                        sleep(0.005)
+            if count_nt % 2 == 1:											# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+                synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
-                if count_nt % 2 == 1:											# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+        # Notes in chord off
+        else:
+            # Notes off
+#            print('CHORD NOTEs OFF: ', notes_in_chord)
+            count_nt = 0
+            for nt in notes_in_chord:
+                if nt >= 0:
+                    synth.set_note_off(nt + capo, 0)
                     synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+                    count_nt = count_nt + 1
+                    sleep(0.005)
 
-        except Exception as e:
-            print('EXCEPTION: ', e)
+            if count_nt % 2 == 1:											# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+                synth._usb_midi[channel].send(NoteOff(0, channel=channel))	# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
     def show_info(self, param, color):
         if param == self.PARAM_ALL:
@@ -1321,180 +1320,160 @@ class Guitar_class:
         self._display.show()
 
     def do_task(self):
-        try:
-            bank = self.chord_bank() * 6
-            if input_device.device_info('GUITAR_CHORD1') == False:
-                self.set_chord_on_button(bank)
-                self.show_info(self.PARAM_GUITAR_ROOT, 1)
+        bank = self.chord_bank() * 6
+        if input_device.device_info('GUITAR_CHORD1') == False:
+            self.set_chord_on_button(bank)
+            self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
-            if input_device.device_info('GUITAR_CHORD2') == False:
-                self.set_chord_on_button(bank + 1)
-                self.show_info(self.PARAM_GUITAR_ROOT, 1)
+        if input_device.device_info('GUITAR_CHORD2') == False:
+            self.set_chord_on_button(bank + 1)
+            self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
-            if input_device.device_info('GUITAR_CHORD3') == False:
-                self.set_chord_on_button(bank + 2)
-                self.show_info(self.PARAM_GUITAR_ROOT, 1)
+        if input_device.device_info('GUITAR_CHORD3') == False:
+            self.set_chord_on_button(bank + 2)
+            self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
-            if input_device.device_info('GUITAR_CHORD4') == False:
-                self.set_chord_on_button(bank + 3)
-                self.show_info(self.PARAM_GUITAR_ROOT, 1)
+        if input_device.device_info('GUITAR_CHORD4') == False:
+            self.set_chord_on_button(bank + 3)
+            self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
-            if input_device.device_info('GUITAR_CHORD5') == False:
-                self.set_chord_on_button(bank + 4)
-                self.show_info(self.PARAM_GUITAR_ROOT, 1)
+        if input_device.device_info('GUITAR_CHORD5') == False:
+            self.set_chord_on_button(bank + 4)
+            self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
-            if input_device.device_info('GUITAR_CHORD6') == False:
-                self.set_chord_on_button(bank + 5)
-                self.show_info(self.PARAM_GUITAR_ROOT, 1)
+        if input_device.device_info('GUITAR_CHORD6') == False:
+            self.set_chord_on_button(bank + 5)
+            self.show_info(self.PARAM_GUITAR_ROOT, 1)
 
-            if input_device.device_info('GUITAR_CHORD_BANK') == False:
-                self.chord_bank(self.chord_bank() + 1)
-                self.show_info(self.PARAM_GUITAR_CHORDSET, 1)
-                
-        except Exception as e:
-            print('EXCEPTION: ', e)
+        if input_device.device_info('GUITAR_CHORD_BANK') == False:
+            self.chord_bank(self.chord_bank() + 1)
+            self.show_info(self.PARAM_GUITAR_CHORDSET, 1)
 
     def do_task_settings(self):
-        try:
+        current_button = self.chord_on_button()
+        
+        if input_device.device_info('GUITAR_BUTTON') == False:
+            self.chord_on_button(current_button + 1)
             current_button = self.chord_on_button()
-            
-            if input_device.device_info('GUITAR_BUTTON') == False:
-                self.chord_on_button(current_button + 1)
-                current_button = self.chord_on_button()
-                self.set_chord_on_button(current_button)
-                self.show_info_settings(self.PARAM_ALL, 1)
+            self.set_chord_on_button(current_button)
+            self.show_info_settings(self.PARAM_ALL, 1)
 
-            button_data = self.chord_on_button(current_button)
-            
-            if input_device.device_info('GUITAR_ROOT') == False:
-                self.chord_on_button(current_button, button_data['ROOT'] + 1, None, None, None, None)
-                self.set_chord_on_button(current_button)
-                self.show_info_settings(self.PARAM_ALL, 1)
+        button_data = self.chord_on_button(current_button)
         
-            if input_device.device_info('GUITAR_CHORD') == False:
-                self.chord_on_button(current_button, None, button_data['CHORD'] + 1, None, None, None)
-                self.set_chord_on_button(current_button)
-                self.show_info_settings(self.PARAM_ALL, 1)
-        
-            if input_device.device_info('GUITAR_POSITION') == False:
-                self.chord_on_button(current_button, None, None, button_data['POSITION'] + 1, None, None)
-                self.set_chord_on_button(current_button)
-                self.show_info_settings(self.PARAM_ALL, 1)
-        
-            if input_device.device_info('GUITAR_ONCHORD') == False:
-                on_note = -1 if button_data['ON_NOTE'] >= 11 else (button_data['ON_NOTE'] + 1)
-                self.chord_on_button(current_button, None, None, None, None, on_note)
-                self.set_chord_on_button(current_button)
-                self.show_info_settings(self.PARAM_ALL, 1)
+        if input_device.device_info('GUITAR_ROOT') == False:
+            self.chord_on_button(current_button, button_data['ROOT'] + 1, None, None, None, None)
+            self.set_chord_on_button(current_button)
+            self.show_info_settings(self.PARAM_ALL, 1)
+    
+        if input_device.device_info('GUITAR_CHORD') == False:
+            self.chord_on_button(current_button, None, button_data['CHORD'] + 1, None, None, None)
+            self.set_chord_on_button(current_button)
+            self.show_info_settings(self.PARAM_ALL, 1)
+    
+        if input_device.device_info('GUITAR_POSITION') == False:
+            self.chord_on_button(current_button, None, None, button_data['POSITION'] + 1, None, None)
+            self.set_chord_on_button(current_button)
+            self.show_info_settings(self.PARAM_ALL, 1)
+    
+        if input_device.device_info('GUITAR_ONCHORD') == False:
+            on_note = -1 if button_data['ON_NOTE'] >= 11 else (button_data['ON_NOTE'] + 1)
+            self.chord_on_button(current_button, None, None, None, None, on_note)
+            self.set_chord_on_button(current_button)
+            self.show_info_settings(self.PARAM_ALL, 1)
 
-            if input_device.device_info('GUITAR_OCTAVE') == False:
-                self.chord_on_button(current_button, None, None, None, button_data['SCALE'] + 1, None)
-                self.set_chord_on_button(current_button)
-                self.show_info_settings(self.PARAM_ALL, 1)
-        
-            if input_device.device_info('GUITAR_CHORD_FILE') == False:
-                self.chord_file(self.chord_file() + 1)
-                self.show_info_settings(self.PARAM_ALL, 1)
-
-        except Exception as e:
-            print('EXCEPTION: ', e)
+        if input_device.device_info('GUITAR_OCTAVE') == False:
+            self.chord_on_button(current_button, None, None, None, button_data['SCALE'] + 1, None)
+            self.set_chord_on_button(current_button)
+            self.show_info_settings(self.PARAM_ALL, 1)
+    
+        if input_device.device_info('GUITAR_CHORD_FILE') == False:
+            self.chord_file(self.chord_file() + 1)
+            self.show_info_settings(self.PARAM_ALL, 1)
 
     def do_task_config1(self):
-        try:
-            if   input_device.device_info('GUITAR_BASE_VOLUME') == False:
-                self.offset_velocity(self.offset_velocity() + 10)
-                self.show_info_config1(self.PARAM_ALL, 1)
+        if   input_device.device_info('GUITAR_BASE_VOLUME') == False:
+            self.offset_velocity(self.offset_velocity() + 10)
+            self.show_info_config1(self.PARAM_ALL, 1)
+            
+        elif input_device.device_info('GUITAR_VELOCITY_CURVE') == False:
+            adc0.velocity_curve(adc0.velocity_curve() + 0.1)
+            self.show_info_config1(self.PARAM_ALL, 1)
+            
+        elif input_device.device_info('GUITAR_PITCH_BEND_RANGE') == False:
+            self.pitch_bend_range(self.pitch_bend_range() + 1)
+            synth.set_pitch_bend_range(self.pitch_bend_range())
+            self.show_info_config1(self.PARAM_ALL, 1)
+            
+        elif input_device.device_info('GUITAR_CHORUS_LEVEL') == False:
+            val = self.chorus_level() + 10
+            if val > 127:
+                val = 0
                 
-            elif input_device.device_info('GUITAR_VELOCITY_CURVE') == False:
-                adc0.velocity_curve(adc0.velocity_curve() + 0.1)
-                self.show_info_config1(self.PARAM_ALL, 1)
+            self.chorus_level(val)
+            self.show_info_config1(self.PARAM_ALL, 1)
+            
+        elif input_device.device_info('GUITAR_CHORUS_FEEDBACK') == False:
+            val = self.chorus_feedback() + 10
+            if val > 127:
+                val = 0
                 
-            elif input_device.device_info('GUITAR_PITCH_BEND_RANGE') == False:
-                self.pitch_bend_range(self.pitch_bend_range() + 1)
-                synth.set_pitch_bend_range(self.pitch_bend_range())
-                self.show_info_config1(self.PARAM_ALL, 1)
+            self.chorus_feedback(val)
+            self.show_info_config1(self.PARAM_ALL, 1)
+            
+        elif input_device.device_info('GUITAR_AFTER_TOUCH') == False:
+            val = adc0.after_touch_counter() + 200
+            if val > 3000:
+                val = 200
                 
-            elif input_device.device_info('GUITAR_CHORUS_LEVEL') == False:
-                val = self.chorus_level() + 10
-                if val > 127:
-                    val = 0
-                    
-                self.chorus_level(val)
-                self.show_info_config1(self.PARAM_ALL, 1)
-                
-            elif input_device.device_info('GUITAR_CHORUS_FEEDBACK') == False:
-                val = self.chorus_feedback() + 10
-                if val > 127:
-                    val = 0
-                    
-                self.chorus_feedback(val)
-                self.show_info_config1(self.PARAM_ALL, 1)
-                
-            elif input_device.device_info('GUITAR_AFTER_TOUCH') == False:
-                val = adc0.after_touch_counter() + 200
-                if val > 3000:
-                    val = 200
-                    
-                adc0.after_touch_counter(val)
-                self.show_info_config1(self.PARAM_ALL, 1)
-
-        except Exception as e:
-            print('EXCEPTION: ', e)
+            adc0.after_touch_counter(val)
+            self.show_info_config1(self.PARAM_ALL, 1)
 
     def do_task_config2(self):
-        try:
-            if input_device.device_info('GUITAR_CAPOTASTO') == False:
-                self.capotasto(self.capotasto() + 1)
-                self.show_info_config2(self.PARAM_GUITAR_CAPOTASTO, 1)
-       
-            elif input_device.device_info('GUITAR_INSTRUMENT') == False:
-                self.program_number(self.program_number()[0] + 1)
-                synth.set_program_change(self.program_number()[1]) 
-                self.show_info_config2(self.PARAM_ALL, 1)
-       
-            elif input_device.device_info('GUITAR_MIDI_CHANNEL') == False:
-                self.midi_channel(self.midi_channel() + 1)
-                self.show_info_config2(self.PARAM_ALL, 1)
-       
-            elif input_device.device_info('GUITAR_DRUM_SET') == False:
-                self.drum_mode(not self.drum_mode())
-                self.show_info_config2(self.PARAM_ALL, 1)
-       
-            elif input_device.device_info('GUITAR_DRUM_FILE') == False:
-                self.drum_file(self.drum_file() + 1)
-                self.show_info_config2(self.PARAM_ALL, 1)
-
-        except Exception as e:
-            print('EXCEPTION: ', e)
+        if input_device.device_info('GUITAR_CAPOTASTO') == False:
+            self.capotasto(self.capotasto() + 1)
+            self.show_info_config2(self.PARAM_GUITAR_CAPOTASTO, 1)
+   
+        elif input_device.device_info('GUITAR_INSTRUMENT') == False:
+            self.program_number(self.program_number()[0] + 1)
+            synth.set_program_change(self.program_number()[1]) 
+            self.show_info_config2(self.PARAM_ALL, 1)
+   
+        elif input_device.device_info('GUITAR_MIDI_CHANNEL') == False:
+            self.midi_channel(self.midi_channel() + 1)
+            self.show_info_config2(self.PARAM_ALL, 1)
+   
+        elif input_device.device_info('GUITAR_DRUM_SET') == False:
+            self.drum_mode(not self.drum_mode())
+            self.show_info_config2(self.PARAM_ALL, 1)
+   
+        elif input_device.device_info('GUITAR_DRUM_FILE') == False:
+            self.drum_file(self.drum_file() + 1)
+            self.show_info_config2(self.PARAM_ALL, 1)
 
     def do_task_music(self):
-        try:
-            if   input_device.device_info('GUITAR_CHORD_NEXT') == False:
-                self.music_chord(self.music_chord() + 1)
-                self.show_info_music(self.PARAM_ALL, 1)
-                
-            elif input_device.device_info('GUITAR_MUSIC_PREV') == False:
-                self.music_file(self.music_file() - 1)
-                self.show_info_music(self.PARAM_ALL, 1)
+        if   input_device.device_info('GUITAR_CHORD_NEXT') == False:
+            self.music_chord(self.music_chord() + 1)
+            self.show_info_music(self.PARAM_ALL, 1)
+            
+        elif input_device.device_info('GUITAR_MUSIC_PREV') == False:
+            self.music_file(self.music_file() - 1)
+            self.show_info_music(self.PARAM_ALL, 1)
 
-            elif input_device.device_info('GUITAR_MUSIC_NEXT') == False:
-                self.music_file(self.music_file() + 1)
-                self.show_info_music(self.PARAM_ALL, 1)
+        elif input_device.device_info('GUITAR_MUSIC_NEXT') == False:
+            self.music_file(self.music_file() + 1)
+            self.show_info_music(self.PARAM_ALL, 1)
 
-            elif input_device.device_info('GUITAR_CHORD_PREV') == False:
-                self.music_chord(self.music_chord() - 1)
-                self.show_info_music(self.PARAM_ALL, 1)
+        elif input_device.device_info('GUITAR_CHORD_PREV') == False:
+            self.music_chord(self.music_chord() - 1)
+            self.show_info_music(self.PARAM_ALL, 1)
 
-            elif input_device.device_info('GUITAR_CHORD_TOP') == False:
-                self.music_chord(0)
-                self.show_info_music(self.PARAM_ALL, 1)
+        elif input_device.device_info('GUITAR_CHORD_TOP') == False:
+            self.music_chord(0)
+            self.show_info_music(self.PARAM_ALL, 1)
 
-            elif input_device.device_info('GUITAR_CHORD_LAST') == False:
-                self.music_chord(-1)
-                self.show_info_music(self.PARAM_ALL, 1)
-                
-        except Exception as e:
-            print('EXCEPTION: ', e)
+        elif input_device.device_info('GUITAR_CHORD_LAST') == False:
+            self.music_chord(-1)
+            self.show_info_music(self.PARAM_ALL, 1)
         
 ################# End of Guitar Class Definition #################
  
@@ -1637,7 +1616,7 @@ def setup():
     except:
         display = OLED_SSD1306_class(None)
         pico_led.value = False
-        print('ERROR I2C1')
+#        print('ERROR I2C1')
         for cnt in list(range(10)):
             pico_led.value = False
             sleep(0.5)
