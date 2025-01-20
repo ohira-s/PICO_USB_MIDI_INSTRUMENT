@@ -62,7 +62,9 @@
 #     1.0.4: 01/20/2025
 #            Improve the velocity curve more natural.
 #            After touch effect (chorus).
-#            MIDI channel selector is available.
+#            MIDI channel selector.
+#     1.0.5: 01/20/2025
+#            Drum set selector.
 #########################################################################
 
 import asyncio
@@ -210,17 +212,17 @@ _TICKS_MAX = const(_TICKS_PERIOD-1)
 _TICKS_HALFPERIOD = const(_TICKS_PERIOD//2)
 
 def ticks_add(ticks, delta):
-    "Add a delta to a base number of ticks, performing wraparound at 2**29ms."
+#    "Add a delta to a base number of ticks, performing wraparound at 2**29ms."
     return (ticks + delta) % _TICKS_PERIOD
 
 def ticks_diff(ticks1, ticks2):
-    "Compute the signed difference between two ticks values, assuming that they are within 2**28 ticks"
+#    "Compute the signed difference between two ticks values, assuming that they are within 2**28 ticks"
     diff = (ticks1 - ticks2) & _TICKS_MAX
     diff = ((diff + _TICKS_HALFPERIOD) & _TICKS_MAX) - _TICKS_HALFPERIOD
     return diff
 
 def ticks_less(ticks1, ticks2):
-    "Return true iff ticks1 is less than ticks2, assuming that they are within 2**28 ticks"
+#    "Return true iff ticks1 is less than ticks2, assuming that they are within 2**28 ticks"
     return ticks_diff(ticks1, ticks2) < 0
 
 class ADC_Device_class:
@@ -334,7 +336,7 @@ class ADC_Device_class:
                     if string <= 5:
                         # Play a string
                         if self._note_on[string]:
-                            print('PLAY a STRING OFF:', 5 - string)
+#                            print('PLAY a STRING OFF:', 5 - string)
                             self._note_on[string] = False
                             self._adc_on[string] = False
 
@@ -344,7 +346,7 @@ class ADC_Device_class:
                             synth.set_pitch_bend(8192)
                             self._adc_on[6] = False                    
 
-                        print('PLAY a STRING:', 5 - string, voltage, velocity)
+#                        print('PLAY a STRING:', 5 - string, voltage, velocity)
                         self._note_on[string] = True
                         chord_note = instrument_guitar.play_a_string(5 - string, velocity)
                         self._adc_on[string] = True
@@ -352,7 +354,7 @@ class ADC_Device_class:
                     # Play chord
                     elif string == 7:
                         if self._play_chord:
-                            print('PLAY CHORD OFF')
+#                            print('PLAY CHORD OFF')
                             self._play_chord = False
                             self._adc_on[string] = False
 
@@ -362,7 +364,7 @@ class ADC_Device_class:
                             synth.set_pitch_bend(8192)
                             self._adc_on[6] = False                    
                         
-                        print('PLAY CHORD:', voltage, velocity)
+#                        print('PLAY CHORD:', voltage, velocity)
                         instrument_guitar.play_chord(True, velocity)
                         self._play_chord = True
                         self._adc_on[string] = True
@@ -375,10 +377,10 @@ class ADC_Device_class:
                             self._note_on[string] = False
                             synth.set_pitch_bend(8192)
                             self._adc_on[string] = False                    
-                            print('PITCH BEND OFF')
+#                            print('PITCH BEND OFF')
 
                         bend_velocity = 9000 + int((7000 / 127) * velocity)
-                        print('PITCH BEND ON:', bend_velocity, voltage, velocity)
+#                        print('PITCH BEND ON:', bend_velocity, voltage, velocity)
                         synth.set_pitch_bend(bend_velocity)
                         self._note_on[string] = True
                         self._adc_on[string] = True
@@ -529,22 +531,24 @@ class USB_MIDI_Instrument_class:
         if channel is None:
             channel = self.midi_channel()
 
-        print('MIDI SEND:', channel, midi_msg)
+#        print('MIDI SEND:', channel, midi_msg)
 #        print('INSTANCE:', isinstance(midi_msg, NoteOn), isinstance(midi_msg, NoteOff), self._send_note_on[channel])
         if isinstance(midi_msg, NoteOn):
             if midi_msg.note in self._send_note_on[channel]:
                 self._usb_midi[channel].send(NoteOff(midi_msg.note, channel=channel))
 #                print('MIDI NOTE OFF:', midi_msg.note)
+#                print('NOTE ON CH-a:', channel, self._send_note_on[channel])
 
             else:
                 self._send_note_on[channel].append(midi_msg.note)
-                
+
             pico_led.value = True
 
         elif isinstance(midi_msg, NoteOff):
 #            print('GET NOTE OFF:' + str(midi_msg.note))
             if midi_msg.note in self._send_note_on[channel]:
                 self._send_note_on[channel].remove(midi_msg.note)
+#                print('NOTE ON CH-b:', channel, self._send_note_on[channel])
 
             pico_led.value = False
 
@@ -693,7 +697,9 @@ class Guitar_class:
         self.value_guitar_chord = 0		# Current chord
         self.value_guitar_on_note = -1	# Current on note (-1 means no note)
         
-        self._programs = [-1, 24, 25, 26, 27, 28, 29, 30, 31, 104, 105, 106, 107]	# Instrument number in GM
+        with open('SYNTH/MIDIFILE/instruments.json', 'r') as f:
+            self._programs = json.load(f)	# Instrument number in GM
+
         self._program_number = 0  		# Steel Guitar
         self._scale_number = 4			# Normal guitar scale
         self._chord_position = 0		# 0: Low chord, 1: High chord
@@ -707,20 +713,8 @@ class Guitar_class:
         # Chord on button
         self._chord_bank = 0
         self._chord_on_button_number = 0
-        self._chord_on_button = [
-                {'ROOT': 0, 'CHORD': 0, 'POSITION': 0, 'ON_NOTE': -1, 'SCALE': 4},		# CM Low
-                {'ROOT': 7, 'CHORD': 0, 'POSITION': 0, 'ON_NOTE': -1, 'SCALE': 4},		# GM Low
-                {'ROOT': 9, 'CHORD': 5, 'POSITION': 0, 'ON_NOTE': -1, 'SCALE': 4},		# Am Low
-                {'ROOT': 4, 'CHORD': 5, 'POSITION': 0, 'ON_NOTE': -1, 'SCALE': 4},		# Em Low
-                {'ROOT': 5, 'CHORD': 0, 'POSITION': 0, 'ON_NOTE': -1, 'SCALE': 4},		# FM Low
-                {'ROOT': 2, 'CHORD': 5, 'POSITION': 0, 'ON_NOTE': -1, 'SCALE': 4},		# Dm Low
-                {'ROOT': 0, 'CHORD': 0, 'POSITION': 1, 'ON_NOTE': -1, 'SCALE': 4},		# CM High
-                {'ROOT': 7, 'CHORD': 0, 'POSITION': 1, 'ON_NOTE': -1, 'SCALE': 4},		# GM High
-                {'ROOT': 9, 'CHORD': 5, 'POSITION': 1, 'ON_NOTE': -1, 'SCALE': 4},		# Am High
-                {'ROOT': 4, 'CHORD': 5, 'POSITION': 1, 'ON_NOTE': -1, 'SCALE': 4},		# Em High
-                {'ROOT': 5, 'CHORD': 0, 'POSITION': 1, 'ON_NOTE': -1, 'SCALE': 4},		# FM High
-                {'ROOT': 2, 'CHORD': 5, 'POSITION': 1, 'ON_NOTE': -1, 'SCALE': 4}		# Dm High
-            ]
+        with open('SYNTH/MIDIFILE/switch.json', 'r') as f:
+            self._chord_on_button = json.load(f)
 
         # Preset chord set files
         self._chord_file_num = -1
@@ -739,6 +733,20 @@ class Guitar_class:
             self._music_list = json.load(f)
 
 #        print(self._music_list)
+
+        # Drums (0..5 correnspond to 6-strings)
+        self._drum_set = [1, 6, 3, 10, 11, 16]
+        self._drum_mode = False
+        self._drum_insts = None
+        with open('SYNTH/MIDIFILE/drums.json', 'r') as f:
+            self._drum_insts = json.load(f)
+            
+        self._drum_list = []
+        self._drum_file_num = -1
+        with open('SYNTH/DRUM/list.json', 'r') as f:
+            self._drum_list = json.load(f)
+        
+#        print('DRUMS: ', self._drum_insts)
 
         # Device aliases for play mode
         input_device.device_alias('GUITAR_CHORD_BANK', 'BUTTON_1')		# Chord set bank
@@ -766,9 +774,11 @@ class Guitar_class:
         input_device.device_alias('GUITAR_CHORUS_FEEDBACK',  'BUTTON_6')
         input_device.device_alias('GUITAR_AFTER_TOUCH',      'BUTTON_7')
 
-        input_device.device_alias('GUITAR_CAPOTASTO',        'BUTTON_2')
-        input_device.device_alias('GUITAR_INSTRUMENT',       'BUTTON_3')
-        input_device.device_alias('GUITAR_MIDI_CHANNEL',     'BUTTON_4')
+        input_device.device_alias('GUITAR_MIDI_CHANNEL',     'BUTTON_2')
+        input_device.device_alias('GUITAR_CAPOTASTO',        'BUTTON_3')
+        input_device.device_alias('GUITAR_INSTRUMENT',       'BUTTON_4')
+        input_device.device_alias('GUITAR_DRUM_SET',         'BUTTON_5')
+        input_device.device_alias('GUITAR_DRUM_FILE',        'BUTTON_6')
 
         # Device aliases for music mode
         input_device.device_alias('GUITAR_CHORD_NEXT', 'BUTTON_1')
@@ -809,6 +819,12 @@ class Guitar_class:
             synth.midi_channel(self._midi_channel)
 
         return self._midi_channel
+
+    def drum_mode(self, turn_on=None):
+        if turn_on is not None:
+            self._drum_mode = turn_on
+            
+        return self._drum_mode
 
     def chorus_level(self, level=None):
         if level is not None:
@@ -927,7 +943,7 @@ class Guitar_class:
             return self._chord_file_num
 
         except Exception as e:
-            print(e, self._chord_files[self._chord_file_num][0])
+#            print(e, self._chord_files[self._chord_file_num][0])
             return self._chord_file_num
 
     def music_file(self, file_num=None):
@@ -962,7 +978,7 @@ class Guitar_class:
             return self._music_num
             
         except Exception as e:
-            print(e, self._music_list[self._music_num][0])
+#            print(e, self._music_list[self._music_num][0])
             return self._music_num
 
     def music_chord(self, chord_num=None):
@@ -980,6 +996,23 @@ class Guitar_class:
                 self._scale_number        = chord[4]	# Scale
 
         return self._music_chord_num
+
+    def drum_file(self, file_num=None):
+        if file_num is None or len(self._drum_list) <= 0:
+            return self._drum_file_num
+
+        try:
+            self._drum_file_num = file_num % len(self._drum_list)
+            with open('SYNTH/DRUM/' + self._drum_list[self._drum_file_num][0], 'r') as f:
+                json_data = json.load(f)
+
+            self._drum_list[self._drum_file_num][1] = json_data['NAME']
+            self._drum_set = json_data['SET']
+            return self._drum_file_num
+
+        except Exception as e:
+#            print(e, self._drum_list[self._drum_file_num][0])
+            return self._drum_file_num
 
     def pitch_bend_range(self, bend_range=None):
         if bend_range is not None:
@@ -1091,8 +1124,16 @@ class Guitar_class:
             channel = self.midi_channel()
 
         # Play strings in the current chord
-        string_notes = self.chord_notes()
-        chord_note = string_notes[string]
+        if self.drum_mode() == False:
+            string_notes = self.chord_notes()
+            chord_note = string_notes[string]
+        
+        # Drum set
+        else:
+            chord_note = self._drum_insts[self._drum_set[string]]['NOTE']
+            channel = 10
+            
+        # Play a note
         if chord_note >= 0:
             # Note on
             if string_velocity > 0:
@@ -1106,6 +1147,7 @@ class Guitar_class:
 
         return chord_note
 
+
     def play_chord(self, play=True, velocity=127, channel=None):
         try:
             capo = self.capotasto()
@@ -1115,7 +1157,7 @@ class Guitar_class:
 
             # Play a chord selected
             if play:
-                print('CHORD NOTEs ON : ', notes_in_chord)
+#                print('CHORD NOTEs ON : ', notes_in_chord)
                 velocity = velocity + self.offset_velocity()
                 if velocity > 127:
                     velocity = 127
@@ -1134,7 +1176,7 @@ class Guitar_class:
             # Notes in chord off
             else:
                 # Notes off
-                print('CHORD NOTEs OFF: ', notes_in_chord)
+#                print('CHORD NOTEs OFF: ', notes_in_chord)
                 count_nt = 0
                 for nt in notes_in_chord:
                     if nt >= 0:
@@ -1195,7 +1237,7 @@ class Guitar_class:
                 
             # Notes in chord
             notes = self.chord_notes()
-            print('NOTES=', notes)
+#            print('NOTES=', notes)
             for i in list(range(6)):
                 nt = notes[5-i]
                 if nt < 0:
@@ -1213,9 +1255,9 @@ class Guitar_class:
     def show_info_settings(self, param, color):
         if param == self.PARAM_ALL:
             self._display.show_message('--GUITAR SETTINGS--', 0, 0, color)
-            self._display.show_message('BUTTN: ' + str(self._chord_on_button_number + 1), 0, 9, color)
+            self._display.show_message('SWTCH: ' + str(self._chord_on_button_number + 1), 0, 9, color)
             index = self.chord_file()
-            self._display.show_message('FILE : ' + (self._chord_files[index][1] if index >= 0 else '---'), 0, 36, color)
+            self._display.show_message('CD FL: ' + (self._chord_files[index][1] if index >= 0 else '---'), 0, 36, color)
             
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_ROOT:
             self._display.show_message('CHORD: ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_root], 0, 18, color)
@@ -1236,7 +1278,7 @@ class Guitar_class:
     def show_info_config1(self, param, color):
         if param == self.PARAM_ALL:
             self._display.show_message('--GUITAR CONFIG1--', 0, 0, color)
-            self._display.show_message('OFFSET VELOCITY : {:d}'.format(self.offset_velocity()), 0, 9, color)
+            self._display.show_message('VELOCITY OFFSET : {:d}'.format(self.offset_velocity()), 0, 9, color)
             self._display.show_message('VELOCITY CURVE  : {:3.1f}'.format(adc0.velocity_curve()), 0, 18, color)
             self._display.show_message('PITCH BEND RANGE:{:+d}'.format(self.pitch_bend_range()), 0, 27, color)
             self._display.show_message('CHORUS LEVEL    : {:d}'.format(self.chorus_level()), 0, 36, color)
@@ -1248,13 +1290,15 @@ class Guitar_class:
     def show_info_config2(self, param, color):
         if param == self.PARAM_ALL:
             self._display.show_message('--GUITAR CONFIG2--', 0, 0, color)
-            self._display.show_message('MIDI OUT CHANNEL: ' + str(self.midi_channel() + 1), 0, 27, color)
+            self._display.show_message('MIDI CHANNEL  : ' + str(self.midi_channel() + 1), 0, 9, color)
+            self._display.show_message('PLAY DRUM     : ' + ('ON' if self.drum_mode() else 'OFF'), 0, 36, color)
+            self._display.show_message('DRUM: ' + self._drum_list[self.drum_file()][1], 0, 45, color)
 
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CAPOTASTO:
-            self._display.show_message('CAPOTASTO FRETS :{:+d}'.format(self.capotasto()), 0, 9, color)
+            self._display.show_message('CAPOTASTO FRET:{:+d}'.format(self.capotasto()), 0, 18, color)
              
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
-            self._display.show_message('INST: ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 18, color)
+            self._display.show_message('INST: ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 27, color)
 
         self._display.show()
 
@@ -1410,6 +1454,14 @@ class Guitar_class:
        
             elif input_device.device_info('GUITAR_MIDI_CHANNEL') == False:
                 self.midi_channel(self.midi_channel() + 1)
+                self.show_info_config2(self.PARAM_ALL, 1)
+       
+            elif input_device.device_info('GUITAR_DRUM_SET') == False:
+                self.drum_mode(not self.drum_mode())
+                self.show_info_config2(self.PARAM_ALL, 1)
+       
+            elif input_device.device_info('GUITAR_DRUM_FILE') == False:
+                self.drum_file(self.drum_file() + 1)
                 self.show_info_config2(self.PARAM_ALL, 1)
 
         except Exception as e:
@@ -1569,10 +1621,10 @@ def setup():
     pico_led.direction = digitalio.Direction.OUTPUT
 
     # OLED SSD1306
-    print('setup')
+#    print('setup')
     pico_led.value = True                    
     try:
-        print('OLED setup')
+#        print('OLED setup')
         i2c0 = I2C(GP17, GP16)		# I2C-0 (SCL, SDA)
         display = OLED_SSD1306_class(i2c0, 0x3C, 128, 64)
         device_oled = adafruit_ssd1306.SSD1306_I2C(display.width(), display.height(), display.i2c())
@@ -1600,7 +1652,7 @@ def setup():
     input_device = Input_Devices_class(display)
 
     # Instruments and application
-    print('Start application.')
+#    print('Start application.')
     instrument_guitar = Guitar_class(display)
     application = Application_class(display)
 
