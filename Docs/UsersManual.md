@@ -107,9 +107,9 @@
 ### 6-10. Mode Change
 　このスイッチを押すとコンフィグレーションモードに移行します。<br/>
 
-## 7. コンフィグレーションモード
-　コンフィグレーションモードでは、演奏の全体的な設定ができます。<br/>
-![picoguitar_guitar_configs.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_guitar_configs.png)
+## 7. コンフィグレーションモード1
+　コンフィグレーションモード1では、演奏の全体的な設定ができます。<br/>
+![picoguitar_guitar_config1.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_guitar_config1.png)
 
 ### 7-1. Velocity Offset
 　8個のパッドは圧力を検知して、MIDI NOTE-ONのベロシティを変更して演奏する音の大きさを変えています。このスイッチを押すとベロシティの下限を変更できます。ベロシティの範囲が大きくて弱い音の音量が小さすぎるといった場合は、この値を大きくすることで解消できます。<br/>
@@ -122,62 +122,114 @@
 　ピッチベンドで変化する音程の範囲を設定できます。スイッチを押すたびに0〜+12の範囲で変化します。1が半音に相当するので、最大1オクターブの範囲で設定できます。<br/>
 　0を選ぶとピッチベンドのパッドを押しても音程は変化しなくなります。<br/>
 
-### 7-4. Capotasto
+### 7-4. Chorus Level
 　カポタストを付けるフレットの位置を設定できます。-12〜+12の範囲で変更できます。0でカポタストなしです。実際のギターでマイナスのカポタストは付けられませんが、Pico Guitarでは可能としました。<br/>
 　コード設定のOctave Selectorではオクターブ単位での音程を設定できましたが、カポタストではさらに半音単位で音程を変更できます。<br/>
 
-### 7-5. Instrument Selector
-　MIDI GM音源内の楽器を変更できます。スイッチを押すたびに切り替わります。各種ギターとシタールなどの弦楽器系から選択できます。<br/>
-　選択した時点でMIDIのプログラムチェンジが送信され、音源のプログラムが切り替わります（その後、音源側でプログラムを変更した場合は、その音で演奏されます）
+### 7-5. Chorus Feedback
+　カポタストを付けるフレットの位置を設定できます。-12〜+12の範囲で変更できます。0でカポタストなしです。実際のギターでマイナスのカポタストは付けられませんが、Pico Guitarでは可能としました。<br/>
+　コード設定のOctave Selectorではオクターブ単位での音程を設定できましたが、カポタストではさらに半音単位で音程を変更できます。<br/>
+
+### 7-6. After Touch On
+　カポタストを付けるフレットの位置を設定できます。-12〜+12の範囲で変更できます。0でカポタストなしです。実際のギターでマイナスのカポタストは付けられませんが、Pico Guitarでは可能としました。<br/>
+　コード設定のOctave Selectorではオクターブ単位での音程を設定できましたが、カポタストではさらに半音単位で音程を変更できます。<br/>
+
 ### 7-6. 8 Pads
  　設定中のコードは8個のパッドを指で押して演奏できます。<br/>
 
 ### 7-7. Display
 　コンフィグレーション時の画面は以下のようになっています。<br/>
-![configs.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/configs.jpg)
+![config1.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/config1.jpg)
 <br/>
-・OFFSET VELOCITY:<br/>
+・VELOC OFFSET:<br/>
 　指定されたベロシティの下限値が表示されています。<br/><br/>
-・VELOCITY CURVE:<br/>
+・VELOC CURVE:<br/>
 　指定されたベロシティカーブの値が表示されています。<br/><br/>
-・PITCH BEND RANGE:<br/>
+・P-BEND RANGE:<br/>
 　指定されたピッチベンドレンジの値が表示されています。<br/><br/>
-・CAPOTASTO FRETS:<br/>
+・CHORUS LEVEL:<br/>
+　指定されたコーラスのレベルが表示されています。<br/>
+・CHORUS FBACK:<br/>
+　選択されたコーラスのフィードバックが表示されています。<br/>
+・AFT-TOUCH ON:<br/>
+　コーラスがかかるまでのアフタータッチの秒数が表示されています。<br/>
+
+### 7-8. Mode Change
+　このスイッチを押すとコンフィグレーションモード2に移行します。<br/>
+
+## 8. コンフィグレーションモード2
+　コンフィグレーションモード2では、演奏の全体的な設定ができます。<br/>
+![picoguitar_guitar_config2.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_guitar_config2.png)
+
+### 8-1. MIDI Channel
+　カポタストを付けるフレットの位置を設定できます。-12〜+12の範囲で変更できます。0でカポタストなしです。実際のギターでマイナスのカポタストは付けられませんが、Pico Guitarでは可能としました。<br/>
+　コード設定のOctave Selectorではオクターブ単位での音程を設定できましたが、カポタストではさらに半音単位で音程を変更できます。<br/>
+
+### 8-2. Capotasto
+　カポタストを付けるフレットの位置を設定できます。-12〜+12の範囲で変更できます。0でカポタストなしです。実際のギターでマイナスのカポタストは付けられませんが、Pico Guitarでは可能としました。<br/>
+　コード設定のOctave Selectorではオクターブ単位での音程を設定できましたが、カポタストではさらに半音単位で音程を変更できます。<br/>
+
+### 8-3. Instrument Selector
+　MIDI GM音源内の楽器を変更できます。スイッチを押すたびに切り替わります。各種ギターとシタールなどの弦楽器系から選択できます。<br/>
+　選択した時点でMIDIのプログラムチェンジが送信され、音源のプログラムが切り替わります（その後、音源側でプログラムを変更した場合は、その音で演奏されます）
+
+### 8-4. Play Drum
+　MIDI GM音源内の楽器を変更できます。スイッチを押すたびに切り替わります。各種ギターとシタールなどの弦楽器系から選択できます。<br/>
+　選択した時点でMIDIのプログラムチェンジが送信され、音源のプログラムが切り替わります（その後、音源側でプログラムを変更した場合は、その音で演奏されます）
+
+### 8-4. Drum Set Selector
+　MIDI GM音源内の楽器を変更できます。スイッチを押すたびに切り替わります。各種ギターとシタールなどの弦楽器系から選択できます。<br/>
+　選択した時点でMIDIのプログラムチェンジが送信され、音源のプログラムが切り替わります（その後、音源側でプログラムを変更した場合は、その音で演奏されます）
+
+### 8-5. 8 Pads
+ 　設定中のコードは8個のパッドを指で押して演奏できます。<br/>
+
+### 8-6. Display
+　コンフィグレーション時の画面は以下のようになっています。<br/>
+![config2.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/config2.jpg)
+<br/>
+・MIDI CHANNEL:<br/>
+　指定されたMIDI OUT CHANNELが表示されています。<br/><br/>
+・CAPOTASTO FRET:<br/>
 　指定されたカポタストのフレット位置が表示されています。<br/>
 ・INST:<br/>
 　選択されたGM音源楽器名が表示されています。<br/>
+・PLAY DRUM:<br/>
+　ドラム演奏機能のON/OFFが表示されています。ONのとき、ギターの6弦に相当するPad1〜6がドラム用に変化します。ストローク演奏とピッチベンドはそのままです。<br/><br/>
+・DRUM:<br/>
+　指定されたドラムセット名が表示されています。<br/><br/>
 
-### 7-8. Mode Change
+### 8-7. Mode Change
 　このスイッチを押すとコード譜演奏モードに移行します。<br/>
 
-## 8. コード譜演奏モード
+## 9. コード譜演奏モード
 　コード譜演奏モードでは、あらかじめ保存されているコード譜を使ってスイッチを押すだけでコードが切り替わって曲を演奏できます。コード譜は複数保存可能です（個数制限はありません。PICOのメモリが許す範囲で保存できます）<br/>
 ![picoguitar_play_music.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_play_music.png)
 
-### 8-1. Previous File
+### 9-1. Previous File
 　1つ前のコード譜ファイルを選択します。演奏対象のコードはコード譜の先頭になります。<br/>
 
-### 8-2. Next File
+### 9-2. Next File
 　1つ後ろのコード譜ファイルを選択します。演奏対象のコードはコード譜の先頭になります。<br/>
 
-### 8-3. Previous Chord
+### 9-3. Previous Chord
 　演奏しているコードの1つ前のコードに戻します。譜面の先頭で押すと最後のコードに移動します。<br/>
 
-### 8-4. Next Chord
+### 9-4. Next Chord
 　演奏しているコードの次のコードに移動ます。通常は曲に合わせてこのスイッチを押し、次のコードへ切り替えながらパッドでコードを演奏します。<br/>
 　コード設定では12個のコードまで設定できましたが、コード譜ではその制限もなく、譜面通りに必要なコードを設定して演奏できます。<br/>
 　最後のコードのところでNext Chordを押すと曲の終わりを表すEndという表示になります。ここでNext Chordを押すと先頭に戻ります。<br/>
 
-### 8-4. Head of Music
+### 9-4. Head of Music
 　譜面の先頭のコードに戻します。<br/>
 
-### 8-5. End of Music
+### 9-5. End of Music
 　譜面の最後のコードに移動します。<br/>
  
-### 8-6. 8 Pads
+### 9-6. 8 Pads
  　コード譜面で選択されているコードは8個のパッドを指で押して演奏できます。Next Chordでコードを切り替えながら簡単に演奏を楽しめます。<br/>
 
-### 8-7. Display
+### 9-7. Display
 　コード譜演奏時の画面は以下のようになっています。<br/>
 ![music_player.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/music_player.jpg)
 <br/>

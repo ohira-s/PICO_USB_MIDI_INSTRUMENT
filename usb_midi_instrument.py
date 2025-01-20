@@ -740,9 +740,12 @@ class Guitar_class:
         # Drums (0..5 correnspond to 6-strings)
         self._drum_set = [1, 6, 3, 10, 11, 16]
         self._drum_mode = False
-        self._drum_insts = None
+        self._drum_insts = []
         with open('SYNTH/MIDIFILE/drums.json', 'r') as f:
-            self._drum_insts = json.load(f)
+            json_data = json.load(f)
+#            self._drum_insts = json_data
+            for inst in json_data:
+                self._drum_insts.append(inst['NOTE'])
             
         self._drum_list = []
         self._drum_file_num = -1
@@ -1133,7 +1136,8 @@ class Guitar_class:
         
         # Drum set
         else:
-            chord_note = self._drum_insts[self._drum_set[string]]['NOTE']
+#            chord_note = self._drum_insts[self._drum_set[string]]['NOTE']
+            chord_note = self._drum_insts[self._drum_set[string]]
             channel = 10
             
         # Play a note
