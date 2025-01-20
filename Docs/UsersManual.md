@@ -65,7 +65,7 @@
 　コード設定モードでは、コード演奏モードのChord Selectorsの6個のスイッチにコードを割り当てることができます。<br/>
 ![picoguitar_guitar_settings.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_guitar_settings.png)
 
-### 6-1. Chord Switch Selector
+### 6-1. Switch Selector
 　コードを割り当てるスイッチの番号を選択します。押すたびに番号が1〜12に変化し、12で押すと1に戻ります。<br/>
 　1,2,3,4,5,6はスイッチの緑、黄、橙、赤、茶、灰に対応します。コード演奏モードのChord Pageで切り替えられる1ページ目に相当します。7〜12の6個はその2ページ目に相当します。演奏中によく使うコードを1ページ目、稀に登場するコードは2ページ目に割り当てると良いかもしれません。<br/>
 
@@ -95,13 +95,13 @@
 　コード設定時の画面は以下のようになっています。<br/>
 ![chord_settings.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/chord_settings.jpg)
 <br/>
-・BUTTN:<br/>
+・SWTCH:<br/>
 　Chord Switch Selectorで選択されたChord Selectorsスイッチの番号が表示されています。このスイッチにコードを設定することになります。<br/><br/>
 ・CHORD:<br/>
 　Root Selector、Chord Selector、Low/High Selector、On-chord Selectorで指定されたコード名が表示されています。<br/><br/>
 ・OCTAV:<br/>
 　設定されているオクターブが表示されます。通常は4です。<br/><br/>
-・FILE:<br/>
+・CD FL:<br/>
 　選択されたコード設定ファイルのタイトルが表示されています。<br/><br/>
 
 ### 6-10. Mode Change
@@ -110,7 +110,7 @@
 ## 7. コンフィグレーションモード1
 　コンフィグレーションモード1では、演奏の全体的な設定ができます。<br/>
 ![picoguitar_guitar_config1.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_guitar_config1.png)
-
+<br/>
 ### 7-1. Velocity Offset
 　8個のパッドは圧力を検知して、MIDI NOTE-ONのベロシティを変更して演奏する音の大きさを変えています。このスイッチを押すとベロシティの下限を変更できます。ベロシティの範囲が大きくて弱い音の音量が小さすぎるといった場合は、この値を大きくすることで解消できます。<br/>
 　ただし、この値が大きくなるほどベロシティの変化範囲が狭くなるので、音の強弱の変化が少なくなります。<br/>
@@ -160,7 +160,7 @@
 ## 8. コンフィグレーションモード2
 　コンフィグレーションモード2では、演奏の全体的な設定ができます。<br/>
 ![picoguitar_guitar_config2.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_guitar_config2.png)
-
+<br/>
 ### 8-1. MIDI Channel
 　カポタストを付けるフレットの位置を設定できます。-12〜+12の範囲で変更できます。0でカポタストなしです。実際のギターでマイナスのカポタストは付けられませんが、Pico Guitarでは可能としました。<br/>
 　コード設定のOctave Selectorではオクターブ単位での音程を設定できましたが、カポタストではさらに半音単位で音程を変更できます。<br/>
