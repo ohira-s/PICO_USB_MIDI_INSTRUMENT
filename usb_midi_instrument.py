@@ -59,6 +59,9 @@
 #            Instrument selector moved to the config mode.
 #            On-chord selector is available in the chord settings mode.
 #            Remove all timing control codes to keep MIDI-SEND duration.
+#     1.0.4: 01/20/2025
+#            Improve the velocity curve more natural.
+#            After touch effect (chorus).
 #########################################################################
 
 import asyncio
@@ -212,17 +215,24 @@ class ADC_Device_class:
         self._adc_name = adc_name
         self._note_on = [False] * 7				# 6 strings on guitar, and effector
         self._play_chord = False
-#        self._voltage_gate = [(100.0,20.0)] * 8	 # for Piezo elements
-        self._voltage_gate = [(400.0,200.0)] * 8		# for Resistor elements
+#        self._voltage_gate = [(400.0,200.0)] * 8		# for Resistor elements
+        self._voltage_gate = [(800.0,100.0)] * 8		# for Resistor elements
         self._adc_on = [False] * 8
-        
         self._velocity_curve = 2.7
+        self._on_counter = [0.0] * 8
+        self._after_touch_count = 200
 
     def adc(self):
         return self._adc
 
     def adc_name(self):
         return self._adc_name
+
+    def after_touch_counter(self, cnt=None):
+        if cnt is not None:
+            self._after_touch_count = cnt
+            
+        return self._after_touch_count
 
     def velocity_curve(self, curve=None):
         if curve is not None:
@@ -239,7 +249,8 @@ class ADC_Device_class:
         self._4051_selectors[0].value =  analog_channel & 0x1
         self._4051_selectors[1].value = (analog_channel & 0x2) >> 1
         self._4051_selectors[2].value = (analog_channel & 0x4) >> 2
-        voltage = self._adc.value * 5.0 / 65535
+#        voltage = self._adc.value * 5.0 / 65535
+        voltage = self._adc.value * 4.55 / 65535
         return voltage
 
     def adc_handler(self):
@@ -247,13 +258,20 @@ class ADC_Device_class:
         velo_curve = self.velocity_curve()
         velo_factor = math.pow(velo_curve, 5)
         for string in list(range(8)):
-            voltage = self.get_voltage(string)
-            voltage = (math.pow(velo_curve, voltage) - 1) / velo_factor * 10000.0
+            voltage_raw = self.get_voltage(string)
+#            voltage = (math.pow(velo_curve, voltage) - 1) / velo_factor * 10000.0
+            voltage = voltage_raw * (voltage_raw/3.55) * (voltage_raw/3.55) / velo_factor * 1000000.0
             if voltage > 5000.0:
                 voltage = 5000.0
 
             # Pad is released
             if   voltage <= self._voltage_gate[string][1]:
+                # Turn off after touch effect
+                if self._on_counter[string] >= self._after_touch_count:
+                    synth.set_chorus(0, 0, 0, 0, channel=0)
+
+                self._on_counter[string] = 0
+
 #                print('PAD RELEASED:', string, voltage)
                 #Note a string off
                 if string <= 5:
@@ -278,68 +296,83 @@ class ADC_Device_class:
                         print('PITCH BEND off')
                         
             # Pad is tapped
-            elif voltage >= self._voltage_gate[string][0] and self._adc_on[string] == False:
+            elif voltage >= self._voltage_gate[string][0]:
                 pass_voltage = self._voltage_gate[string][0]
-                print('PAD PRESSED:', string, voltage)
+
                 # velocity
-                velocity = int((voltage - pass_voltage) * 128.0 * 3.0 / (5000.0 - pass_voltage)) + 30
+#                velocity = int((voltage - pass_voltage) * 128.0 * 3.0 / (5000.0 - pass_voltage)) + 30
+                velocity = int((voltage - pass_voltage) * 128.0 / (5000.0 - pass_voltage)) + 1
                 if velocity > 127:
                     velocity = 127
-                
-                # Play a string
-                if string <= 5:
+
+                # First touch
+                if self._adc_on[string] == False:
+                    self._on_counter[string] = 0
+                    if string == 5:
+                        print('PAD PRESSED:', string, voltage_raw, voltage, velocity)
+
                     # Play a string
-                    if self._note_on[string]:
-                        print('PLAY a STRING OFF:', 5 - string)
-                        self._note_on[string] = False
-                        self._adc_on[string] = False
-###                        instrument_guitar.play_a_string(5 - string, 0)
+                    if string <= 5:
+                        # Play a string
+                        if self._note_on[string]:
+                            print('PLAY a STRING OFF:', 5 - string)
+                            self._note_on[string] = False
+                            self._adc_on[string] = False
 
-                    # Pitch bend off
-                    if self._note_on[6]:
-                        self._note_on[6] = False
-                        synth.set_pitch_bend( 8192, 0)
-                        self._adc_on[6] = False                    
+                        # Pitch bend off
+                        if self._note_on[6]:
+                            self._note_on[6] = False
+                            synth.set_pitch_bend( 8192, 0)
+                            self._adc_on[6] = False                    
 
-                    print('PLAY a STRING:', 5 - string, voltage, velocity)
-                    self._note_on[string] = True
-                    chord_note = instrument_guitar.play_a_string(5 - string, velocity)
-                    self._adc_on[string] = True
+                        print('PLAY a STRING:', 5 - string, voltage, velocity)
+                        self._note_on[string] = True
+                        chord_note = instrument_guitar.play_a_string(5 - string, velocity)
+                        self._adc_on[string] = True
                     
-                # Play chord
-                elif string == 7:
-                    if self._play_chord:
-                        print('PLAY CHORD OFF')
-###                        instrument_guitar.play_chord(False)
-                        self._play_chord = False
-                        self._adc_on[string] = False
+                    # Play chord
+                    elif string == 7:
+                        if self._play_chord:
+                            print('PLAY CHORD OFF')
+                            self._play_chord = False
+                            self._adc_on[string] = False
 
-                    # Pitch bend off
-                    if self._note_on[6]:
-                        self._note_on[6] = False
-                        synth.set_pitch_bend( 8192, 0)
-                        self._adc_on[6] = False                    
+                        # Pitch bend off
+                        if self._note_on[6]:
+                            self._note_on[6] = False
+                            synth.set_pitch_bend( 8192, 0)
+                            self._adc_on[6] = False                    
                         
-                    print('PLAY CHORD:', voltage, velocity)
-                    instrument_guitar.play_chord(True, velocity)
-                    self._play_chord = True
-                    self._adc_on[string] = True
+                        print('PLAY CHORD:', voltage, velocity)
+                        instrument_guitar.play_chord(True, velocity)
+                        self._play_chord = True
+                        self._adc_on[string] = True
                     
-                # Pad 6
-                elif string == 6:
-##                    application._DEBUG_MODE = not application._DEBUG_MODE
-##                    application.show_message('DEBUG:' + ('on' if application._DEBUG_MODE else 'off'), 0, 54, 1)
-                    if self._note_on[string]:
-                        self._note_on[string] = False
-                        synth.set_pitch_bend( 8192, 0)
-                        self._adc_on[string] = False                    
-                        print('PITCH BEND OFF')
+                    # Pad 6
+                    elif string == 6:
+##                        application._DEBUG_MODE = not application._DEBUG_MODE
+##                        application.show_message('DEBUG:' + ('on' if application._DEBUG_MODE else 'off'), 0, 54, 1)
+                        if self._note_on[string]:
+                            self._note_on[string] = False
+                            synth.set_pitch_bend( 8192, 0)
+                            self._adc_on[string] = False                    
+                            print('PITCH BEND OFF')
 
-                    bend_velocity = 9000 + int((7000 / 127) * velocity)
-                    print('PITCH BEND ON:', bend_velocity, voltage, velocity)
-                    synth.set_pitch_bend(bend_velocity, 0)
-                    self._note_on[string] = True
-                    self._adc_on[string] = True
+                        bend_velocity = 9000 + int((7000 / 127) * velocity)
+                        print('PITCH BEND ON:', bend_velocity, voltage, velocity)
+                        synth.set_pitch_bend(bend_velocity, 0)
+                        self._note_on[string] = True
+                        self._adc_on[string] = True
+                        
+                # Pad after touch
+                else:
+                    self._on_counter[string] = self._on_counter[string] + 1
+                    if self._on_counter[string] == self._after_touch_count:
+                        synth.set_chorus(3, 80, 10, 0, channel=0)
+
+                    elif self._on_counter[string] > self._after_touch_count:
+                        self._on_counter[string] = self._after_touch_count
+
 
 ################# End of ADC Class Definition #################
 
@@ -670,8 +703,9 @@ class Guitar_class:
         input_device.device_alias('GUITAR_BASE_VOLUME',      'BUTTON_2')
         input_device.device_alias('GUITAR_VELOCITY_CURVE',   'BUTTON_3')
         input_device.device_alias('GUITAR_PITCH_BEND_RANGE', 'BUTTON_4')
-        input_device.device_alias('GUITAR_CAPOTASTO',        'BUTTON_5')
-        input_device.device_alias('GUITAR_INSTRUMENT',       'BUTTON_6')
+        input_device.device_alias('GUITAR_AFTER_TOUCH',      'BUTTON_5')
+        input_device.device_alias('GUITAR_CAPOTASTO',        'BUTTON_6')
+        input_device.device_alias('GUITAR_INSTRUMENT',       'BUTTON_7')
 
         # Device aliases for music mode
         input_device.device_alias('GUITAR_CHORD_NEXT', 'BUTTON_1')
@@ -1115,12 +1149,13 @@ class Guitar_class:
             self._display.show_message('OFFSET VELOCITY : {:d}'.format(self.offset_velocity()), 0, 9, color)
             self._display.show_message('VELOCITY CURVE  : {:3.1f}'.format(adc0.velocity_curve()), 0, 18, color)
             self._display.show_message('PITCH BEND RANGE:{:+d}'.format(self.pitch_bend_range()), 0, 27, color)
+            self._display.show_message('AFTER TOUCH ON  : {:d}'.format(adc0.after_touch_counter()), 0, 36, color)
 
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CAPOTASTO:
-            self._display.show_message('CAPOTASTO FRETS :{:+d}'.format(self.capotasto()), 0, 36, color)
+            self._display.show_message('CAPOTASTO FRETS :{:+d}'.format(self.capotasto()), 0, 45, color)
              
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
-            self._display.show_message('INST: ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 45, color)
+            self._display.show_message('INST: ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 54, color)
 
         self._display.show()
 
@@ -1238,7 +1273,15 @@ class Guitar_class:
                 self.pitch_bend_range(self.pitch_bend_range() + 1)
                 synth.set_pitch_bend_range(self.pitch_bend_range(), 0)
                 self.show_info_configs(self.PARAM_ALL, 1)
-        
+                
+            elif input_device.device_info('GUITAR_AFTER_TOUCH') == False:
+                val = adc0.after_touch_counter() + 25
+                if val > 400:
+                    val = 50
+                    
+                adc0.after_touch_counter(val)
+                self.show_info_configs(self.PARAM_ALL, 1)
+
             elif input_device.device_info('GUITAR_CAPOTASTO') == False:
                 self.capotasto(self.capotasto() + 1)
                 self.show_info_configs(self.PARAM_GUITAR_CAPOTASTO, 1)
