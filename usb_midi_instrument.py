@@ -62,6 +62,7 @@
 #     1.0.4: 01/20/2025
 #            Improve the velocity curve more natural.
 #            After touch effect (chorus).
+#            MIDI channel selector is available.
 #########################################################################
 
 import asyncio
@@ -83,7 +84,7 @@ from adafruit_midi.pitch_bend import PitchBend
 from adafruit_midi.program_change import ProgramChange
 
 import board
-#import supervisor
+import supervisor
 
 import adafruit_ssd1306			# for SSD1306 OLED Display
 
@@ -101,12 +102,12 @@ async def catch_pin_transitions(pin, pin_name, callback_pressed=None, callback_r
             event = keys.events.get()
             if event:
                 if event.pressed:
-                    print("pin went low: " + pin_name)
+#                    print("pin went low: " + pin_name)
                     if callback_pressed is not None:
                         callback_pressed(pin_name)
                         
                 elif event.released:
-                    print("pin went high: " + pin_name)
+#                    print("pin went high: " + pin_name)
                     if callback_released is not None:
                         callback_released(pin_name)
 
@@ -163,7 +164,7 @@ class OLED_SSD1306_class:
         return self._i2c
     
     def get_display(self):
-        print('DISPLAT')
+#        print('DISPLAY')
         return self._display
     
     def width(self):
@@ -204,6 +205,24 @@ class OLED_SSD1306_class:
 ###############
 ### ADC class
 ###############
+_TICKS_PERIOD = const(1<<29)
+_TICKS_MAX = const(_TICKS_PERIOD-1)
+_TICKS_HALFPERIOD = const(_TICKS_PERIOD//2)
+
+def ticks_add(ticks, delta):
+    "Add a delta to a base number of ticks, performing wraparound at 2**29ms."
+    return (ticks + delta) % _TICKS_PERIOD
+
+def ticks_diff(ticks1, ticks2):
+    "Compute the signed difference between two ticks values, assuming that they are within 2**28 ticks"
+    diff = (ticks1 - ticks2) & _TICKS_MAX
+    diff = ((diff + _TICKS_HALFPERIOD) & _TICKS_MAX) - _TICKS_HALFPERIOD
+    return diff
+
+def ticks_less(ticks1, ticks2):
+    "Return true iff ticks1 is less than ticks2, assuming that they are within 2**28 ticks"
+    return ticks_diff(ticks1, ticks2) < 0
+
 class ADC_Device_class:
     def __init__(self, adc_pin, adc_name):
         self._adc = AnalogIn(adc_pin)
@@ -220,7 +239,7 @@ class ADC_Device_class:
         self._adc_on = [False] * 8
         self._velocity_curve = 2.7
         self._on_counter = [0.0] * 8
-        self._after_touch_count = 200
+        self._after_touch_count = 1000
 
     def adc(self):
         return self._adc
@@ -267,8 +286,8 @@ class ADC_Device_class:
             # Pad is released
             if   voltage <= self._voltage_gate[string][1]:
                 # Turn off after touch effect
-                if self._on_counter[string] >= self._after_touch_count:
-                    synth.set_chorus(0, 0, 0, 0, channel=0)
+                if self._on_counter[string] < 0:
+                    synth.set_chorus(0, 0, 0, 0)
 
                 self._on_counter[string] = 0
 
@@ -278,22 +297,20 @@ class ADC_Device_class:
                     if self._note_on[string]:
                         self._note_on[string] = False
                         self._adc_on[string] = False
-###                        instrument_guitar.play_a_string(5 - string, 0)
                 
                 # Note a chord off
                 elif string == 7:
                     if self._play_chord:
                         self._play_chord = False
                         self._adc_on[string] = False
-###                        instrument_guitar.play_chord(False)
 
                 # Finish pitch bend
                 elif string == 6:
                     if self._note_on[string]:
                         self._note_on[string] = False
-                        synth.set_pitch_bend( 8192, 0)
+                        synth.set_pitch_bend(8192)
                         self._adc_on[string] = False                    
-                        print('PITCH BEND off')
+#                        print('PITCH BEND off')
                         
             # Pad is tapped
             elif voltage >= self._voltage_gate[string][0]:
@@ -307,9 +324,11 @@ class ADC_Device_class:
 
                 # First touch
                 if self._adc_on[string] == False:
-                    self._on_counter[string] = 0
-                    if string == 5:
-                        print('PAD PRESSED:', string, voltage_raw, voltage, velocity)
+#                    self._on_counter[string] = 0
+                    self._on_counter[string] = supervisor.ticks_ms()
+
+#                    if string == 5:
+#                        print('PAD PRESSED:', string, voltage_raw, voltage, velocity)
 
                     # Play a string
                     if string <= 5:
@@ -322,7 +341,7 @@ class ADC_Device_class:
                         # Pitch bend off
                         if self._note_on[6]:
                             self._note_on[6] = False
-                            synth.set_pitch_bend( 8192, 0)
+                            synth.set_pitch_bend(8192)
                             self._adc_on[6] = False                    
 
                         print('PLAY a STRING:', 5 - string, voltage, velocity)
@@ -340,7 +359,7 @@ class ADC_Device_class:
                         # Pitch bend off
                         if self._note_on[6]:
                             self._note_on[6] = False
-                            synth.set_pitch_bend( 8192, 0)
+                            synth.set_pitch_bend(8192)
                             self._adc_on[6] = False                    
                         
                         print('PLAY CHORD:', voltage, velocity)
@@ -354,24 +373,26 @@ class ADC_Device_class:
 ##                        application.show_message('DEBUG:' + ('on' if application._DEBUG_MODE else 'off'), 0, 54, 1)
                         if self._note_on[string]:
                             self._note_on[string] = False
-                            synth.set_pitch_bend( 8192, 0)
+                            synth.set_pitch_bend(8192)
                             self._adc_on[string] = False                    
                             print('PITCH BEND OFF')
 
                         bend_velocity = 9000 + int((7000 / 127) * velocity)
                         print('PITCH BEND ON:', bend_velocity, voltage, velocity)
-                        synth.set_pitch_bend(bend_velocity, 0)
+                        synth.set_pitch_bend(bend_velocity)
                         self._note_on[string] = True
                         self._adc_on[string] = True
                         
                 # Pad after touch
                 else:
-                    self._on_counter[string] = self._on_counter[string] + 1
-                    if self._on_counter[string] == self._after_touch_count:
-                        synth.set_chorus(3, 80, 10, 0, channel=0)
+#                    self._on_counter[string] = self._on_counter[string] + 1
+#                    if self._on_counter[string] == self._after_touch_count:
+                    if self._on_counter[string] > 0 and ticks_diff(supervisor.ticks_ms(), self._on_counter[string]) >= self._after_touch_count:
+                        synth.set_chorus(3, instrument_guitar.chorus_level(), instrument_guitar.chorus_feedback(), 0)
+                        self._on_counter[string] = -1
 
-                    elif self._on_counter[string] > self._after_touch_count:
-                        self._on_counter[string] = self._after_touch_count
+#                    elif self._on_counter[string] > self._after_touch_count:
+#                        self._on_counter[string] = self._after_touch_count
 
 
 ################# End of ADC Class Definition #################
@@ -458,12 +479,19 @@ class USB_MIDI_Instrument_class:
         self._note_key = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
         # USB MIDI device
-        print('USB MIDI:', usb_midi.ports)
+#        print('USB MIDI:', usb_midi.ports)
+        self._midi_channel = 0
         self._send_note_on = [[]] * 16
         self._usb_midi = [None] * 16
 #        self._usb_midi[0] = adafruit_midi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1], out_channel=0)
         for channel in list(range(16)):
             self._usb_midi[channel] = adafruit_midi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1], out_channel=channel)
+
+    def midi_channel(self, channel=None):
+        if channel is not None:
+            self._midi_channel = channel % 15
+            
+        return self._midi_channel
 
     # Get instrument name
     def get_instrument_name(self, program, gmbank=0):
@@ -497,9 +525,11 @@ class USB_MIDI_Instrument_class:
         return name
 
     # MIDI sends to USB as a USB device
-    def midi_send(self, midi_msg, channel=0):
-        channel = channel % 16
-        print('MIDI SEND:', midi_msg)
+    def midi_send(self, midi_msg, channel=None):
+        if channel is None:
+            channel = self.midi_channel()
+
+        print('MIDI SEND:', channel, midi_msg)
 #        print('INSTANCE:', isinstance(midi_msg, NoteOn), isinstance(midi_msg, NoteOff), self._send_note_on[channel])
         if isinstance(midi_msg, NoteOn):
             if midi_msg.note in self._send_note_on[channel]:
@@ -532,19 +562,25 @@ class USB_MIDI_Instrument_class:
                 application.show_message('OFF:' + str(midi_msg.note), 0, 55, 1)
 
     # Send note on
-    def set_note_on(self, note_key, velocity, channel=0):
+    def set_note_on(self, note_key, velocity, channel=None):
+        if channel is None:
+            channel = self.midi_channel()
+
         self.midi_send(NoteOn(note_key, velocity, channel=channel), channel)
 
     # Send note off
-    def set_note_off(self, note_key, channel=0):
+    def set_note_off(self, note_key, channel=None):
+        if channel is None:
+            channel = self.midi_channel()
+
         self.midi_send(NoteOff(note_key, channel=channel), channel)
 #        self.midi_send(NoteOn(note_key, 0, channel=channel), channel)
 
     # Send all notes off
-    def set_all_notes_off(self, channel=0):
+    def set_all_notes_off(self, channel=None):
         pass
     
-    def set_reverb(self, channel, prog, level, feedback):
+    def set_reverb(self, prog, level, feedback, channel=None):
         pass
 #        status_byte = 0xB0 + channel
 #        midi_msg = bytearray([status_byte, 0x50, prog, status_byte, 0x5B, level])
@@ -553,37 +589,57 @@ class USB_MIDI_Instrument_class:
 #            midi_msg = bytearray([0xF0, 0x41, 0x00, 0x42, 0x12, 0x40, 0x01, 0x35, feedback, 0, 0xF7])
 #            self.midi_out(midi_msg)
             
-    def set_chorus(self, prog, level, feedback, delay, channel=0):
+    def set_chorus(self, prog, level, feedback, delay, channel=None):
+        if channel is None:
+            channel = self.midi_channel()
+
         if prog is not None:
             self.midi_send(ControlChange(self.ControlChange_Chorus_Program,  prog, channel=channel),     channel)
+
         if level is not None:
             self.midi_send(ControlChange(self.ControlChange_Chorus_Level,    level, channel=channel),    channel)
+
         if feedback is not None:
             self.midi_send(ControlChange(self.ControlChange_Chorus_Feedback, feedback, channel=channel), channel)
+
         if delay is not None:
             self.midi_send(ControlChange(self.ControlChange_Chorus_Delay,    delay, channel=channel),    channel)
 
-    def set_vibrate(self, rate, depth, delay, channel=0):
+    def set_vibrate(self, rate, depth, delay, channel=None):
+        if channel is None:
+            channel = self.midi_channel()
+
         if rate is not None:
             self.midi_send(ControlChange(self.ControlChange_Vibrate_Rate,  rate, channel=channel),  channel)
+
         if depth is not None:
             self.midi_send(ControlChange(self.ControlChange_Vibrate_Depth, depth, channel=channel), channel)
+
         if delay is not None:
             self.midi_send(ControlChange(self.ControlChange_Vibrate_Delay, delay, channel=channel), channel)
 
     # Send program change
-    def set_program_change(self, program, channel=0):
+    def set_program_change(self, program, channel=None):
         if program >= 0 and program <= 127:
+            if channel is None:
+                channel = self.midi_channel()
+
             self.midi_send(ProgramChange(program, channel=channel), channel)
 ###            synth._usb_midi[channel].send(NoteOff(0, channel=channel))		# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
     # Send pitch bend value
-    def set_pitch_bend(self, value, channel=0):
+    def set_pitch_bend(self, value, channel=None):
+        if channel is None:
+            channel = self.midi_channel()
+
         self.midi_send(PitchBend(value, channel=channel), channel)
 ###        synth._usb_midi[channel].send(NoteOff(0, channel=channel))		# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
     # Send pitch bend range value
-    def set_pitch_bend_range(self, value, channel=0):
+    def set_pitch_bend_range(self, value, channel=None):
+        if channel is None:
+            channel = self.midi_channel()
+
         self.midi_send(ControlChange(0x65, 0, channel=channel), channel)			# RPN LSB
         self.midi_send(ControlChange(0x64, 0, channel=channel), channel)			# RPN MSB
         self.midi_send(ControlChange(0x06, value & 0x7f, channel=channel), channel)	# PRN DATA ENTRY
@@ -593,7 +649,7 @@ class USB_MIDI_Instrument_class:
 #        midi_msg = bytearray([status_byte, 0x65, 0x00, 0x64, 0x00, 0x06, value & 0x7f])
 #        self.midi_out(midi_msg)
 
-    def set_modulation_wheel(self, modulation, value, channel=0):
+    def set_modulation_wheel(self, modulation, value, channel=None):
         pass
 #        self.midi_send(ControlChange(modulation, value, channel=channel), channel)
 
@@ -644,6 +700,9 @@ class Guitar_class:
         self._capotasto = 0				# No capotasto (-12..0..+12)
         self._pitch_bend_range = 2		# 1 is semitone (0..12)
         self._offset_velocity = 30		# Note on velocity offset (0,10,20,...,100)
+        self._chorus_level = 80
+        self._chorus_feedback = 20
+        self._midi_channel = 0			# MIDI channel to send messages
 
         # Chord on button
         self._chord_bank = 0
@@ -703,9 +762,13 @@ class Guitar_class:
         input_device.device_alias('GUITAR_BASE_VOLUME',      'BUTTON_2')
         input_device.device_alias('GUITAR_VELOCITY_CURVE',   'BUTTON_3')
         input_device.device_alias('GUITAR_PITCH_BEND_RANGE', 'BUTTON_4')
-        input_device.device_alias('GUITAR_AFTER_TOUCH',      'BUTTON_5')
-        input_device.device_alias('GUITAR_CAPOTASTO',        'BUTTON_6')
-        input_device.device_alias('GUITAR_INSTRUMENT',       'BUTTON_7')
+        input_device.device_alias('GUITAR_CHORUS_LEVEL',     'BUTTON_5')
+        input_device.device_alias('GUITAR_CHORUS_FEEDBACK',  'BUTTON_6')
+        input_device.device_alias('GUITAR_AFTER_TOUCH',      'BUTTON_7')
+
+        input_device.device_alias('GUITAR_CAPOTASTO',        'BUTTON_2')
+        input_device.device_alias('GUITAR_INSTRUMENT',       'BUTTON_3')
+        input_device.device_alias('GUITAR_MIDI_CHANNEL',     'BUTTON_4')
 
         # Device aliases for music mode
         input_device.device_alias('GUITAR_CHORD_NEXT', 'BUTTON_1')
@@ -717,24 +780,47 @@ class Guitar_class:
 
     def setup(self):
         display.fill(0)
-        synth.set_program_change(self.program_number()[1], 0)
-        synth.set_pitch_bend_range(self.pitch_bend_range(), 0)
+        synth.set_program_change(self.program_number()[1])
+        synth.set_pitch_bend_range(self.pitch_bend_range())
         self.show_info(self.PARAM_ALL, 1)
 
     def setup_settings(self):
         display.fill(0)
         current_button = self.chord_on_button()
         self.set_chord_on_button(current_button)
-        synth.set_program_change(self.program_number()[1], 0) 
+        synth.set_program_change(self.program_number()[1]) 
         self.show_info_settings(self.PARAM_ALL, 1)
 
-    def setup_configs(self):
+    def setup_config1(self):
         display.fill(0)
-        self.show_info_configs(self.PARAM_ALL, 1)
+        self.show_info_config1(self.PARAM_ALL, 1)
+
+    def setup_config2(self):
+        display.fill(0)
+        self.show_info_config2(self.PARAM_ALL, 1)
 
     def setup_music(self):
         display.fill(0)
         self.show_info_music(self.PARAM_ALL, 1)
+
+    def midi_channel(self, channel=None):
+        if channel is not None:
+            self._midi_channel = channel % 16
+            synth.midi_channel(self._midi_channel)
+
+        return self._midi_channel
+
+    def chorus_level(self, level=None):
+        if level is not None:
+            self._chorus_level = level % 128
+            
+        return self._chorus_level
+
+    def chorus_feedback(self, fback=None):
+        if fback is not None:
+            self._chorus_feedback = fback % 128
+            
+        return self._chorus_feedback
 
     def capotasto(self, capo=None):
         if capo is not None:
@@ -853,7 +939,7 @@ class Guitar_class:
                 file_num = -1
                 
             self._music_num = file_num % len(self._music_list)
-            print("MUSIC FILE:", file_num, len(self._music_list), self._music_num)
+#            print("MUSIC FILE:", file_num, len(self._music_list), self._music_num)
             with open('SYNTH/MUSIC/' + self._music_list[self._music_num][0], 'r') as f:
                 json_data = json.load(f)
 
@@ -872,7 +958,7 @@ class Guitar_class:
             else:
                 self._music_chord_num = -1
 
-            print('MUSIC ', self._music_num, self._music)
+#            print('MUSIC ', self._music_num, self._music)
             return self._music_num
             
         except Exception as e:
@@ -898,7 +984,7 @@ class Guitar_class:
     def pitch_bend_range(self, bend_range=None):
         if bend_range is not None:
             self._pitch_bend_range = bend_range % 13
-            synth.set_pitch_bend_range(self._pitch_bend_range, 0)
+            synth.set_pitch_bend_range(self._pitch_bend_range)
             
         return self._pitch_bend_range
 
@@ -976,7 +1062,7 @@ class Guitar_class:
                 if note % 12 == root_mod:
                     notes.insert(0, -1)
                     root_mod = -1
-                    print('IGNORE ROOT for ON-NOTE:', note + (self._scale_number + 1) * 12, self.value_guitar_on_note)
+#                    print('IGNORE ROOT for ON-NOTE:', note + (self._scale_number + 1) * 12, self.value_guitar_on_note)
                 else:
                     notes.insert(0, note + (self._scale_number + 1) * 12)
             else:
@@ -998,9 +1084,11 @@ class Guitar_class:
         return notes
 
     # Play a string
-    def play_a_string(self, string, string_velocity, channel=0):
+    def play_a_string(self, string, string_velocity, channel=None):
 #        print('PLAY a STRING VELO:', string_velocity)
         capo = self.capotasto()
+        if channel is None:
+            channel = self.midi_channel()
 
         # Play strings in the current chord
         string_notes = self.chord_notes()
@@ -1018,10 +1106,12 @@ class Guitar_class:
 
         return chord_note
 
-    def play_chord(self, play=True, velocity=127, channel=0):
+    def play_chord(self, play=True, velocity=127, channel=None):
         try:
             capo = self.capotasto()
             notes_in_chord = self.chord_notes()        
+            if channel is None:
+                channel = self.midi_channel()
 
             # Play a chord selected
             if play:
@@ -1143,19 +1233,28 @@ class Guitar_class:
 
         self._display.show()
 
-    def show_info_configs(self, param, color):
+    def show_info_config1(self, param, color):
         if param == self.PARAM_ALL:
-            self._display.show_message('--GUITAR CONFIGS--', 0, 0, color)
+            self._display.show_message('--GUITAR CONFIG1--', 0, 0, color)
             self._display.show_message('OFFSET VELOCITY : {:d}'.format(self.offset_velocity()), 0, 9, color)
             self._display.show_message('VELOCITY CURVE  : {:3.1f}'.format(adc0.velocity_curve()), 0, 18, color)
             self._display.show_message('PITCH BEND RANGE:{:+d}'.format(self.pitch_bend_range()), 0, 27, color)
-            self._display.show_message('AFTER TOUCH ON  : {:d}'.format(adc0.after_touch_counter()), 0, 36, color)
+            self._display.show_message('CHORUS LEVEL    : {:d}'.format(self.chorus_level()), 0, 36, color)
+            self._display.show_message('CHORUS FEEDBACK : {:d}'.format(self.chorus_feedback()), 0, 45, color)
+            self._display.show_message('AFTER TOUCH ON  : {:3.1f}'.format(adc0.after_touch_counter() / 1000.0), 0, 54, color)
+
+        self._display.show()
+
+    def show_info_config2(self, param, color):
+        if param == self.PARAM_ALL:
+            self._display.show_message('--GUITAR CONFIG2--', 0, 0, color)
+            self._display.show_message('MIDI OUT CHANNEL: ' + str(self.midi_channel() + 1), 0, 27, color)
 
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_CAPOTASTO:
-            self._display.show_message('CAPOTASTO FRETS :{:+d}'.format(self.capotasto()), 0, 45, color)
+            self._display.show_message('CAPOTASTO FRETS :{:+d}'.format(self.capotasto()), 0, 9, color)
              
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
-            self._display.show_message('INST: ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 54, color)
+            self._display.show_message('INST: ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 18, color)
 
         self._display.show()
 
@@ -1239,11 +1338,8 @@ class Guitar_class:
                 self.show_info_settings(self.PARAM_ALL, 1)
         
             if input_device.device_info('GUITAR_ONCHORD') == False:
-                print('ON_NOTE 0=', button_data['ON_NOTE'])
                 on_note = -1 if button_data['ON_NOTE'] >= 11 else (button_data['ON_NOTE'] + 1)
-                print('ON_NOTE 1=', on_note)
                 self.chord_on_button(current_button, None, None, None, None, on_note)
-                print('ON_NOTE 2=', button_data['ON_NOTE'])
                 self.set_chord_on_button(current_button)
                 self.show_info_settings(self.PARAM_ALL, 1)
 
@@ -1259,37 +1355,62 @@ class Guitar_class:
         except Exception as e:
             print('EXCEPTION: ', e)
 
-    def do_task_configs(self):
+    def do_task_config1(self):
         try:
             if   input_device.device_info('GUITAR_BASE_VOLUME') == False:
                 self.offset_velocity(self.offset_velocity() + 10)
-                self.show_info_configs(self.PARAM_ALL, 1)
+                self.show_info_config1(self.PARAM_ALL, 1)
                 
             elif input_device.device_info('GUITAR_VELOCITY_CURVE') == False:
                 adc0.velocity_curve(adc0.velocity_curve() + 0.1)
-                self.show_info_configs(self.PARAM_ALL, 1)
+                self.show_info_config1(self.PARAM_ALL, 1)
                 
             elif input_device.device_info('GUITAR_PITCH_BEND_RANGE') == False:
                 self.pitch_bend_range(self.pitch_bend_range() + 1)
-                synth.set_pitch_bend_range(self.pitch_bend_range(), 0)
-                self.show_info_configs(self.PARAM_ALL, 1)
+                synth.set_pitch_bend_range(self.pitch_bend_range())
+                self.show_info_config1(self.PARAM_ALL, 1)
+                
+            elif input_device.device_info('GUITAR_CHORUS_LEVEL') == False:
+                val = self.chorus_level() + 10
+                if val > 127:
+                    val = 0
+                    
+                self.chorus_level(val)
+                self.show_info_config1(self.PARAM_ALL, 1)
+                
+            elif input_device.device_info('GUITAR_CHORUS_FEEDBACK') == False:
+                val = self.chorus_feedback() + 10
+                if val > 127:
+                    val = 0
+                    
+                self.chorus_feedback(val)
+                self.show_info_config1(self.PARAM_ALL, 1)
                 
             elif input_device.device_info('GUITAR_AFTER_TOUCH') == False:
-                val = adc0.after_touch_counter() + 25
-                if val > 400:
-                    val = 50
+                val = adc0.after_touch_counter() + 200
+                if val > 3000:
+                    val = 200
                     
                 adc0.after_touch_counter(val)
-                self.show_info_configs(self.PARAM_ALL, 1)
+                self.show_info_config1(self.PARAM_ALL, 1)
 
-            elif input_device.device_info('GUITAR_CAPOTASTO') == False:
+        except Exception as e:
+            print('EXCEPTION: ', e)
+
+    def do_task_config2(self):
+        try:
+            if input_device.device_info('GUITAR_CAPOTASTO') == False:
                 self.capotasto(self.capotasto() + 1)
-                self.show_info_configs(self.PARAM_GUITAR_CAPOTASTO, 1)
+                self.show_info_config2(self.PARAM_GUITAR_CAPOTASTO, 1)
        
-            if input_device.device_info('GUITAR_INSTRUMENT') == False:
+            elif input_device.device_info('GUITAR_INSTRUMENT') == False:
                 self.program_number(self.program_number()[0] + 1)
-                synth.set_program_change(self.program_number()[1], 0) 
-                self.show_info_configs(self.PARAM_ALL, 1)
+                synth.set_program_change(self.program_number()[1]) 
+                self.show_info_config2(self.PARAM_ALL, 1)
+       
+            elif input_device.device_info('GUITAR_MIDI_CHANNEL') == False:
+                self.midi_channel(self.midi_channel() + 1)
+                self.show_info_config2(self.PARAM_ALL, 1)
 
         except Exception as e:
             print('EXCEPTION: ', e)
@@ -1338,8 +1459,9 @@ class Application_class:
         
         self.PLAY_GUITAR = 0
         self.GUITAR_SETTINGS = 1
-        self.GUITAR_CONFIGS = 2
-        self.PLAY_MUSIC = 3
+        self.GUITAR_CONFIG1 = 2
+        self.GUITAR_CONFIG2 = 3
+        self.PLAY_MUSIC = 4
         self._screen_mode = self.PLAY_GUITAR
 
         # Device aliases
@@ -1372,7 +1494,7 @@ class Application_class:
 
     def screen_mode(self, inst_num=None):
         if inst_num is not None:
-            self._screen_mode = inst_num % 4
+            self._screen_mode = inst_num % 5
             
         return self._screen_mode
 
@@ -1384,8 +1506,11 @@ class Application_class:
         elif sc_mode == self.GUITAR_SETTINGS:
             instrument_guitar.show_info_settings(param, 1)
             
-        elif sc_mode == self.GUITAR_CONFIGS:
-            instrument_guitar.show_info_configs(param, 1)
+        elif sc_mode == self.GUITAR_CONFIG1:
+            instrument_guitar.show_info_config1(param, 1)
+            
+        elif sc_mode == self.GUITAR_CONFIG2:
+            instrument_guitar.show_info_config2(param, 1)
 
     # Application task called from asyncio, never call this directly.
     def do_task(self):
@@ -1398,8 +1523,11 @@ class Application_class:
             elif sc_mode == self.GUITAR_SETTINGS:
                 instrument_guitar.setup_settings()
                 
-            elif sc_mode == self.GUITAR_CONFIGS:
-                instrument_guitar.setup_configs()
+            elif sc_mode == self.GUITAR_CONFIG1:
+                instrument_guitar.setup_config1()
+                
+            elif sc_mode == self.GUITAR_CONFIG2:
+                instrument_guitar.setup_config2()
                 
             elif sc_mode == self.PLAY_MUSIC:
                 instrument_guitar.setup_music()
@@ -1417,8 +1545,12 @@ class Application_class:
             instrument_guitar.do_task_settings()
 
         # Guitar configs
-        elif sc_mode == self.GUITAR_CONFIGS:
-            instrument_guitar.do_task_configs()
+        elif sc_mode == self.GUITAR_CONFIG1:
+            instrument_guitar.do_task_config1()
+
+        # Guitar configs
+        elif sc_mode == self.GUITAR_CONFIG2:
+            instrument_guitar.do_task_config2()
 
         # Play a music
         elif sc_mode == self.PLAY_MUSIC:
@@ -1513,6 +1645,7 @@ if __name__=='__main__':
     setup()
 
     asyncio.run(main())
+
 
 
 
