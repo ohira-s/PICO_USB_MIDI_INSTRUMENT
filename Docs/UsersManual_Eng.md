@@ -194,10 +194,16 @@ The strumming pad and the pitch bend pad is always for playing guitar.<br/>
 You can select a drum set from the drum setting files.  You need to edit these file with a text editor.<br/>
 MIDI OUT channel 10 is used to send MIDI messages for drums.<br/>
 
-### 8-6. 8 Pads
+### 8-6. Drum Pad Selector
+Select a pad number to change it's drum instrument.<br/>
+
+### 8-7. Drum Selector
+Select a drum instrument.<br/>
+
+### 8-8. 8 Pads
 8 Pads work even in this mode.<br/>
 
-### 8-7. Display
+### 8-9. Display
 OLED display in this mode is as below.<br/>
 ![config2.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/config2.jpg)
 <br/>
@@ -211,8 +217,12 @@ A GM instrument name selected.<br/>
 Assigned Pad1-6 for drums(ON) or guitar(OFF).<br/>
 ・DRUM:<br/>
 A Drum set name selected.<br/><br/>
+・DR2=5:<br/>
+"DRn" means a drum pad number "n" selected.<br/>
+"=x" means a drum instrument ID "x", this ID is an internal code of Pico Guitar.<br/>
+You can see the drum instrument name selected on the right side.<br/><br/>
 
-### 8-8. Mode Change
+### 8-10. Mode Change
 Press this switch, switch to Music Play Mode.<br/>
 
 ## 9. Music Play Mode

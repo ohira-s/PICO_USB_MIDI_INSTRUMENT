@@ -68,6 +68,8 @@
 #     1.0.6: 01/21/2025
 #            After touch effect moves to the modulation,
 #            the chorus does not works properly.
+#     1.0.7: 01/21/2025
+#            Drum set editor is available.
 #########################################################################
 
 import asyncio
@@ -702,6 +704,7 @@ class Guitar_class:
         self.PARAM_GUITAR_CAPOTASTO = 4
         self.PARAM_GUITAR_OCTAVE = 5
         self.PARAM_GUITAR_ONCHORD = 6
+        self.PARAM_GUITAR_DRUM_NAME = 7
 ##        self.PARAM_GUITAR_EFFECTOR = 9
         
         self.value_guitar_root = 0		# Current root
@@ -747,6 +750,7 @@ class Guitar_class:
 
         # Drums (0..5 correnspond to 6-strings)
         self._drum_set = [1, 6, 3, 10, 11, 16]
+        self._current_drum = 0
         self._drum_mode = False
         self._drum_insts = []
         with open('SYNTH/MIDIFILE/drums.json', 'r') as f:
@@ -793,6 +797,8 @@ class Guitar_class:
         input_device.device_alias('GUITAR_INSTRUMENT',       'BUTTON_4')
         input_device.device_alias('GUITAR_DRUM_SET',         'BUTTON_5')
         input_device.device_alias('GUITAR_DRUM_FILE',        'BUTTON_6')
+        input_device.device_alias('GUITAR_DRUM_SELECT',      'BUTTON_7')
+        input_device.device_alias('GUITAR_DRUM_NOTE',        'BUTTON_1')
 
         # Device aliases for music mode
         input_device.device_alias('GUITAR_CHORD_NEXT', 'BUTTON_1')
@@ -840,6 +846,16 @@ class Guitar_class:
             self._drum_mode = turn_on
             
         return self._drum_mode
+
+    def drum_set_name(self, drum_num):
+        note = self._drum_insts[drum_num]
+        with open('SYNTH/MIDIFILE/drums.json', 'r') as f:
+            json_data = json.load(f)
+            for drum in json_data:
+                if drum['NOTE'] == note:
+                    return drum['NAME']
+
+        return '???'
 
     def chorus_level(self, level=None):
         if level is not None:
@@ -1134,7 +1150,6 @@ class Guitar_class:
     # Play a string
     def play_a_string(self, string, string_velocity, channel=None):
 #        print('PLAY a STRING VELO:', string_velocity)
-        capo = self.capotasto()
         if channel is None:
             channel = self.midi_channel()
 
@@ -1142,12 +1157,15 @@ class Guitar_class:
         if self.drum_mode() == False:
             string_notes = self.chord_notes()
             chord_note = string_notes[string]
+            capo = self.capotasto()
         
         # Drum set
         else:
 #            chord_note = self._drum_insts[self._drum_set[string]]['NOTE']
             chord_note = self._drum_insts[self._drum_set[string]]
-            channel = 10
+            print('DRUM NOTE: ', chord_note)
+            capo = 0
+            channel = 9		# MIDI drum channel
             
         # Play a note
         if chord_note >= 0:
@@ -1312,6 +1330,10 @@ class Guitar_class:
         if param == self.PARAM_ALL or param == self.PARAM_GUITAR_PROGRAM:
             self._display.show_message('INST: ' + self.abbrev(synth.get_instrument_name(self.program_number()[1])), 0, 27, color)
 
+        if param == self.PARAM_ALL or param == self.PARAM_GUITAR_DRUM_NAME:
+            drum = self.drum_set_name(self._drum_set[self._current_drum])
+            self._display.show_message('D{:d}={:d}: '.format(self._current_drum + 1, self._drum_set[self._current_drum]) + drum, 0, 54, color)
+
         self._display.show()
 
     def show_info_music(self, param, color):
@@ -1464,6 +1486,14 @@ class Guitar_class:
         elif input_device.device_info('GUITAR_DRUM_FILE') == False:
             self.drum_file(self.drum_file() + 1)
             self.show_info_config2(self.PARAM_ALL, 1)
+   
+        elif input_device.device_info('GUITAR_DRUM_SELECT') == False:
+            self._current_drum = (self._current_drum + 1) % len(self._drum_set)
+            self.show_info_config2(self.PARAM_GUITAR_DRUM_NAME, 1)
+            
+        elif input_device.device_info('GUITAR_DRUM_NOTE') == False:
+            self._drum_set[self._current_drum] = (self._drum_set[self._current_drum] + 1) % 48
+            self.show_info_config2(self.PARAM_GUITAR_DRUM_NAME, 1)
 
     def do_task_music(self):
         if   input_device.device_info('GUITAR_CHORD_NEXT') == False:
