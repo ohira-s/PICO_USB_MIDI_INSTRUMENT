@@ -29,6 +29,7 @@ A USB MIDI sound source module is needed.  This module must work as a USB HOST a
 6) Now you can play Pico Guitar.<br/>
 <br/>
 A photo below is a USB MIDI synthesizer I made and a Pico Guitar.  These devices are connected each other with a USB cable.<br/> 
+
 ![connection.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/connection.jpg)
 <br/>
 
