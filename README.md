@@ -5,6 +5,8 @@ Press a switch to select a chord, then touch the pads to play guitar.  Pico guit
 You can assign drum instruments for 6 pads of guitar strings.  So you can play a guitar chord and drums at the same time.<br/>
 If you have guitar chord score files, you can play the music only to press "Next Chord" switch.<br/>
 ![picoguitar_top_look.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_top_look.png)
+- Photo<br/>
+![pico_guitar.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/pico_guitar.jpg)
 
 PICO is programmed with circuit python.
 
