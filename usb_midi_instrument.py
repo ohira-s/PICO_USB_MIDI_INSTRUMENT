@@ -65,6 +65,9 @@
 #            MIDI channel selector.
 #     1.0.5: 01/20/2025
 #            Drum set selector.
+#     1.0.6: 01/21/2025
+#            After touch effect moves to the modulation,
+#            the chorus does not works properly.
 #########################################################################
 
 import asyncio
@@ -242,6 +245,7 @@ class ADC_Device_class:
         self._velocity_curve = 2.7
         self._on_counter = [0.0] * 8
         self._after_touch_count = 1000
+        self._after_touched = False
 
     def adc(self):
         return self._adc
@@ -290,9 +294,12 @@ class ADC_Device_class:
             if   voltage <= self._voltage_gate[string][1]:
                 # Turn off after touch effect
                 if self._on_counter[string] < 0:
-                    synth.set_chorus(0, 0, 0, 0)
+                    if instrument_guitar.drum_mode() == False or instrument_guitar.drum_mode() and string >= 6:
+#                        synth.set_chorus(3, 0, instrument_guitar.chorus_feedback(), 0)
+                        synth.set_modulation_wheel(0, 0)
+                        self._after_touched = False
 
-                self._on_counter[string] = 0
+                    self._on_counter[string] = 0
 
 #                print('PAD RELEASED:', string, voltage)
                 #Note a string off
@@ -329,9 +336,7 @@ class ADC_Device_class:
                 if self._adc_on[string] == False:
 #                    self._on_counter[string] = 0
                     self._on_counter[string] = supervisor.ticks_ms()
-
-##                    if string == 5:
-                    print('PAD PRESSED:', string, voltage_raw, voltage, velocity)
+##                    print('PAD PRESSED:', string, voltage_raw, voltage, velocity)
 
                     # Play a string
                     if string <= 5:
@@ -387,11 +392,13 @@ class ADC_Device_class:
                         self._adc_on[string] = True
                         
                 # Pad after touch
-                else:
+                elif not self._after_touched and (instrument_guitar.drum_mode() == False or instrument_guitar.drum_mode() and string >= 6):
 #                    self._on_counter[string] = self._on_counter[string] + 1
 #                    if self._on_counter[string] == self._after_touch_count:
                     if self._on_counter[string] > 0 and ticks_diff(supervisor.ticks_ms(), self._on_counter[string]) >= self._after_touch_count:
-                        synth.set_chorus(3, instrument_guitar.chorus_level(), instrument_guitar.chorus_feedback(), 0)
+#                        synth.set_chorus(3, instrument_guitar.chorus_level(), instrument_guitar.chorus_feedback(), 0)
+                        synth.set_modulation_wheel(instrument_guitar.chorus_level(), instrument_guitar.chorus_feedback())
+                        self._after_touched = True
                         self._on_counter[string] = -1
 
 #                    elif self._on_counter[string] > self._after_touch_count:
@@ -486,9 +493,9 @@ class USB_MIDI_Instrument_class:
         self._midi_channel = 0
         self._send_note_on = [[]] * 16
         self._usb_midi = [None] * 16
-#        self._usb_midi[0] = adafruit_midi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1], out_channel=0)
         for channel in list(range(16)):
-            self._usb_midi[channel] = adafruit_midi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1], out_channel=channel)
+#            self._usb_midi[channel] = adafruit_midi.MIDI(midi_in=usb_midi.ports[0], midi_out=usb_midi.ports[1], out_channel=channel)
+            self._usb_midi[channel] = adafruit_midi.MIDI(midi_out=usb_midi.ports[1], out_channel=channel)
 
     def midi_channel(self, channel=None):
         if channel is not None:
@@ -581,49 +588,39 @@ class USB_MIDI_Instrument_class:
             channel = self.midi_channel()
 
         self.midi_send(NoteOff(note_key, channel=channel), channel)
-#        self.midi_send(NoteOn(note_key, 0, channel=channel), channel)
 
     # Send all notes off
     def set_all_notes_off(self, channel=None):
         pass
-    
-    def set_reverb(self, prog, level, feedback, channel=None):
-        pass
-#        status_byte = 0xB0 + channel
-#        midi_msg = bytearray([status_byte, 0x50, prog, status_byte, 0x5B, level])
-#        self.midi_out(midi_msg)
-#        if feedback > 0:
-#            midi_msg = bytearray([0xF0, 0x41, 0x00, 0x42, 0x12, 0x40, 0x01, 0x35, feedback, 0, 0xF7])
-#            self.midi_out(midi_msg)
             
-    def set_chorus(self, prog, level, feedback, delay, channel=None):
+##    def set_chorus(self, prog=None, level=None, feedback=None, delay=None, channel=None):
+##        if channel is None:
+##            channel = self.midi_channel()
+##
+##        midi_msgs = []
+##
+##        if prog is not None:
+##            midi_msgs.append(ControlChange(self.ControlChange_Chorus_Program,  prog, channel=channel))
+##
+##        if level is not None:
+##            midi_msgs.append(ControlChange(self.ControlChange_Chorus_Level,    level, channel=channel))
+##
+##        if feedback is not None:
+##            midi_msgs.append(ControlChange(self.ControlChange_Chorus_Feedback, feedback, channel=channel))
+##
+##        if delay is not None:
+##            midi_msgs.append(ControlChange(self.ControlChange_Chorus_Delay,    delay, channel=channel))
+##
+##        self._usb_midi[channel].send(midi_msgs)
+##        sleep(0.005)
+
+    def set_modulation_wheel(self, value1_MSB, value33_LSB, channel=None):
         if channel is None:
             channel = self.midi_channel()
 
-        if prog is not None:
-            self.midi_send(ControlChange(self.ControlChange_Chorus_Program,  prog, channel=channel),     channel)
-
-        if level is not None:
-            self.midi_send(ControlChange(self.ControlChange_Chorus_Level,    level, channel=channel),    channel)
-
-        if feedback is not None:
-            self.midi_send(ControlChange(self.ControlChange_Chorus_Feedback, feedback, channel=channel), channel)
-
-        if delay is not None:
-            self.midi_send(ControlChange(self.ControlChange_Chorus_Delay,    delay, channel=channel),    channel)
-
-    def set_vibrate(self, rate, depth, delay, channel=None):
-        if channel is None:
-            channel = self.midi_channel()
-
-        if rate is not None:
-            self.midi_send(ControlChange(self.ControlChange_Vibrate_Rate,  rate, channel=channel),  channel)
-
-        if depth is not None:
-            self.midi_send(ControlChange(self.ControlChange_Vibrate_Depth, depth, channel=channel), channel)
-
-        if delay is not None:
-            self.midi_send(ControlChange(self.ControlChange_Vibrate_Delay, delay, channel=channel), channel)
+        self._usb_midi[channel].send(ControlChange(1, value1_MSB, channel=channel))
+        self._usb_midi[channel].send(ControlChange(33, value33_LSB, channel=channel))
+        return
 
     # Send program change
     def set_program_change(self, program, channel=None):
@@ -632,7 +629,6 @@ class USB_MIDI_Instrument_class:
                 channel = self.midi_channel()
 
             self.midi_send(ProgramChange(program, channel=channel), channel)
-###            synth._usb_midi[channel].send(NoteOff(0, channel=channel))		# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
     # Send pitch bend value
     def set_pitch_bend(self, value, channel=None):
@@ -640,7 +636,6 @@ class USB_MIDI_Instrument_class:
             channel = self.midi_channel()
 
         self.midi_send(PitchBend(value, channel=channel), channel)
-###        synth._usb_midi[channel].send(NoteOff(0, channel=channel))		# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
 
     # Send pitch bend range value
     def set_pitch_bend_range(self, value, channel=None):
@@ -650,15 +645,28 @@ class USB_MIDI_Instrument_class:
         self.midi_send(ControlChange(0x65, 0, channel=channel), channel)			# RPN LSB
         self.midi_send(ControlChange(0x64, 0, channel=channel), channel)			# RPN MSB
         self.midi_send(ControlChange(0x06, value & 0x7f, channel=channel), channel)	# PRN DATA ENTRY
-###        synth._usb_midi[channel].send(NoteOff(0, channel=channel))		# THIS CODE IS NEEDED TO NOTE ON IMMEDIATELY
+    
+##    def set_reverb(self, prog, level, feedback, channel=None):
+##        pass
+##        status_byte = 0xB0 + channel
+##        midi_msg = bytearray([status_byte, 0x50, prog, status_byte, 0x5B, level])
+##        self.midi_out(midi_msg)
+##        if feedback > 0:
+##            midi_msg = bytearray([0xF0, 0x41, 0x00, 0x42, 0x12, 0x40, 0x01, 0x35, feedback, 0, 0xF7])
+##            self.midi_out(midi_msg)
 
-#        status_byte = 0xB0 + channel
-#        midi_msg = bytearray([status_byte, 0x65, 0x00, 0x64, 0x00, 0x06, value & 0x7f])
-#        self.midi_out(midi_msg)
-
-    def set_modulation_wheel(self, modulation, value, channel=None):
-        pass
-#        self.midi_send(ControlChange(modulation, value, channel=channel), channel)
+##    def set_vibrate(self, rate, depth, delay, channel=None):
+##        if channel is None:
+##            channel = self.midi_channel()
+##
+##        if rate is not None:
+##            self.midi_send(ControlChange(self.ControlChange_Vibrate_Rate,  rate, channel=channel),  channel)
+##
+##        if depth is not None:
+##            self.midi_send(ControlChange(self.ControlChange_Vibrate_Depth, depth, channel=channel), channel)
+##
+##        if delay is not None:
+##            self.midi_send(ControlChange(self.ControlChange_Vibrate_Delay, delay, channel=channel), channel)
 
 ################# End of Unit-MIDI Class Definition #################
 
@@ -798,6 +806,7 @@ class Guitar_class:
         display.fill(0)
         synth.set_program_change(self.program_number()[1])
         synth.set_pitch_bend_range(self.pitch_bend_range())
+#SOS#        synth.set_chorus(3, 0, self.chorus_feedback(), 0)
         self.show_info(self.PARAM_ALL, 1)
 
     def setup_settings(self):
@@ -1284,8 +1293,8 @@ class Guitar_class:
             self._display.show_message('VELOC OFFSET: {:d}'.format(self.offset_velocity()), 0, 9, color)
             self._display.show_message('VELOC CURVE : {:3.1f}'.format(adc0.velocity_curve()), 0, 18, color)
             self._display.show_message('P-BEND RANGE:{:+d}'.format(self.pitch_bend_range()), 0, 27, color)
-            self._display.show_message('CHORUS LEVEL: {:d}'.format(self.chorus_level()), 0, 36, color)
-            self._display.show_message('CHORUS FBACK: {:d}'.format(self.chorus_feedback()), 0, 45, color)
+            self._display.show_message('MODULA LVL01: {:d}'.format(self.chorus_level()), 0, 36, color)
+            self._display.show_message('MODULA LVL02: {:d}'.format(self.chorus_feedback()), 0, 45, color)
             self._display.show_message('AFT-TOUCH ON: {:3.1f}'.format(adc0.after_touch_counter() / 1000.0), 0, 54, color)
 
         self._display.show()
@@ -1414,6 +1423,7 @@ class Guitar_class:
                 val = 0
                 
             self.chorus_level(val)
+#SOS#            synth.set_chorus(3, self.chorus_level(), self.chorus_feedback(), 0)
             self.show_info_config1(self.PARAM_ALL, 1)
             
         elif input_device.device_info('GUITAR_CHORUS_FEEDBACK') == False:
@@ -1422,6 +1432,7 @@ class Guitar_class:
                 val = 0
                 
             self.chorus_feedback(val)
+#SOS#            synth.set_chorus(3, self.chorus_level(), self.chorus_feedback(), 0)
             self.show_info_config1(self.PARAM_ALL, 1)
             
         elif input_device.device_info('GUITAR_AFTER_TOUCH') == False:
