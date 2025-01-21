@@ -4,7 +4,9 @@
 ## 1. Introduction
 Pico Guitar is a MIDI controller which works as a USB MIDI device.<br/>
 This device has 6 momentary press switchs and 8 touch sensor pads.  You can assign any guitar chord for each momentary press switch.  6 pads correspond to 6 guitar strings.  The rest two pads are a strumming pad and a pitch bend pad.<br/>
-Press a switch to select a chord, then touch the pads to play guitar.  Pico guitar sends MIDI NOTE-ON messages to a USB MIDI sound source module.
+Press a switch to select a chord, then touch the pads to play guitar.  Pico guitar sends MIDI NOTE-ON messages to a USB MIDI sound source module.<br/>
+You can assign drum instruments for 6 pads of guitar strings.  So you can play a guitar chord and drums at the same time.<br/>
+If you have guitar chord score files, you can play the music only to press "Next Chord" switch.<br/>
 
 ## 2. Appearance
 ![picoguitar_top_look.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_top_look.png)
@@ -55,7 +57,7 @@ If the current chord is A/C, high position chord and capotasto is on the 2nd fre
 ・Banjo<br/>
 This shows you the current instrument name in GM sounds source.<br/><br/>
 
-・CM L, AM L/C, ...<br/>
+・CM L, AM L/C#, ...<br/>
 You will see 6 chords on the left-bottom region on OLED display.  These chords correspond to the Chord Selectors (6 switches).<br/>
 "AM L/C" means A major on chord C and low position chord.<br/>
 Press the Chord Page switch, then you will see another chord on each Chord Selector.<br/><br/>
@@ -117,10 +119,10 @@ A Chord Setting name.<br/><br/>
 ### 6-10. Mode Change
 Press this switch, switch to Configuration Mode.<br/>
 
-## 7. Configuration Mode
+## 7. Configuration Mode1
 This mode is for setting up the general parameters.<br/>
-![picoguitar_guitar_configs.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_guitar_configs.png)
-
+![picoguitar_guitar_config1.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_guitar_config1.png)
+<br/>
 ### 7-1. Velocity Offset
 You can select a smallest value of NOTE-ON velocity.<br/>
 8 Pads can detect pressure strength.  Pico Guitar makes NOTE-ON velocity value by the value.  If you think the smallest velocity is too small (can't hear instrument sound), you can change the smallest velocity value.<br/>
@@ -133,19 +135,22 @@ The value range is from 1.5 to 4.0.  Larger value gets bigger curve.<br/>
 You can select a pitch bend range value from 0 to +12. 1 correspond to half tone.<br/>
 Select 0, the pitch bend does NOT work.<br/>
 
-### 7-4. Capotasto
-You can attach a capotasto at a fret.  The Capotasto value is the fret number to attach capotasto.  You can select not only positive value but also negative value.  0 means NO capotasto.<br/>
+### 7-4. Modulation Level01
+You can change the value of modulation level01(LSB).  The modulation works in the after touch phase.<br/>
 
-### 7-5. Instrument Selector
-Select an instrument in GM sounds source.  You can see only stringed instruments.<br/>
-Select an instrument, Pico Guitar sends a MIDI program change message immediately.<br/>
+### 7-5. Modulation Level02
+You can change the value of modulation level02(MSB).  The modulation works in the after touch phase.<br/>
 
-### 7-6. 8 Pads
+### 7-6. After Touch On
+You can change the dulation in second to begin the after touch effect.<br/>
+The after touch does not work on the drum pads.<br/>
+
+### 7-7. 8 Pads
 8 Pads work even in this mode.<br/>
 
-### 7-7. Display
+### 7-8. Display
 OLED display in this mode is as below.<br/>
-![configs.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/configs.jpg)
+![config1.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/config1.jpg)
 <br/>
 ・OFFSET VELOCITY:<br/>
 The current smallest velocity value.<br/><br/>
@@ -162,36 +167,80 @@ The current capotasto fret number.<br/>
 ・INST:<br/>
 The current instrument name.<br/>
 
-### 7-8. Mode Change
+### 7-9. Mode Change
+Press this switch, switch to Configuration Mode2.<br/>
+
+## 8. Configuration Mode2
+This mode is for setting up the general parameters.<br/>
+![picoguitar_guitar_config2.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_guitar_config2.png)
+<br/>
+### 8-1. MIDI Channel
+You can select a MIDI OUT channel to send MIDI messages playing guitar.<br/>
+Channel 10 is used for playing drums.<br/>
+
+### 8-2. Capotasto
+You can attach a capotasto at a fret.  The Capotasto value is the fret number to attach capotasto.  You can select not only positive value but also negative value.  0 means NO capotasto.<br/>
+
+### 8-3. Instrument Selector
+Select an instrument in GM sounds source.  You can see only stringed instruments.<br/>
+Select an instrument, Pico Guitar sends a MIDI program change message immediately.<br/>
+
+### 8-4. Play Drum
+You can change the Pad1-6 for playing drums.  ON is for drums, OFF is for guitar strings.<br/>
+The strumming pad and the pitch bend pad is always for playing guitar.<br/>
+
+### 8-5. Drum Set Selector
+You can select a drum set from the drum setting files.  You need to edit these file with a text editor.<br/>
+MIDI OUT channel 10 is used to send MIDI messages for drums.<br/>
+
+### 8-6. 8 Pads
+8 Pads work even in this mode.<br/>
+
+### 8-7. Display
+OLED display in this mode is as below.<br/>
+![config2.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/config2.jpg)
+<br/>
+・MIDI CHANNEL:<br/>
+MIDI OUT channel selected.<br/><br/>
+・CAPOTASTO FRET:<br/>
+Capotasto fret number selected.<br/>
+・INST:<br/>
+A GM instrument name selected.<br/>
+・PLAY DRUM:<br/>
+Assigned Pad1-6 for drums(ON) or guitar(OFF).<br/>
+・DRUM:<br/>
+A Drum set name selected.<br/><br/>
+
+### 8-8. Mode Change
 Press this switch, switch to Music Play Mode.<br/>
 
-## 8. Music Play Mode
+## 9. Music Play Mode
 In this mode, you can play a music by only pressing one switch and 8 Pads.  It's so easy!!<br/>
 Select a music file in pre-loaded music files, a series of chords for the music are loaded in Pico Guitar.  After that, press the NEXT switch and play with 8 Pads, then press the NEXT switch, and so on.<br/>
 ![picoguitar_play_music.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_play_music.png)
 
-### 8-1. Previous File
+### 9-1. Previous File
 Select a previous music file.<br/>
 
-### 8-2. Next File
+### 9-2. Next File
 Select a next music file.<br/>
 
-### 8-3. Previous Chord
+### 9-3. Previous Chord
 Select a previous chord in the loaded music.<br/>
 
-### 8-4. Next Chord
+### 9-4. Next Chord
 Select a next chord in the loaded music.<br/>
 
-### 8-4. Head of Music
+### 9-4. Head of Music
 Rewind to the head of the music.<br/>
 
-### 8-5. End of Music
+### 9-5. End of Music
 Move to the end of the music.<br/>
  
-### 8-6. 8 Pads
+### 9-6. 8 Pads
 Play the current chord.<br/>
 
-### 8-7. Display
+### 9-7. Display
 OLED display in this mode is as below.<br/>
 ![music_player.jpg](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/music_player.jpg)
 <br/>
@@ -204,5 +253,5 @@ You can see the current chord position and the total number of chords separated 
 ・CHORD:<br/>
 The current chord to play.<br/>
 
-### 8-8. Mode Change
+### 9-8. Mode Change
 Press this switch, switch to Chord Play Mode.<br/>
