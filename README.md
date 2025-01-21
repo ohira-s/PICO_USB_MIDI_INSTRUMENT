@@ -9,3 +9,11 @@ PICO is programmed with circuit python.
 
 # Circuit Sckematics
 [Circuit sckematics is here.](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/PICO_Guitar_Circuit.pdf)
+
+# Software Installation
+1) Copy circuitpython (v9.2.1) into PICO, PICO-W or PICO2.
+2) Copy all file below.
+- usb_midi_instrument.py as code.py.
+- font5x8.bin.
+- lib folder.
+- SYNTH folder.
