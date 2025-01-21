@@ -1,6 +1,11 @@
 # Pico Guitar
-USB MIDI Guitar UI instrument with Raspberry Pi PICO.<br/>
-This device works as a USB device.  USB MIDI Sound module is needed to use this.<br/>
+USB MIDI Guitar UI instrument with Raspberry Pi PICO.  This device works as a USB device.  USB MIDI Sound module is needed to use this.<br/>
+This device has 6 momentary press switchs and 8 touch sensor pads.  You can assign any guitar chord for each momentary press switch.  6 pads correspond to 6 guitar strings.  The rest two pads are a strumming pad and a pitch bend pad.<br/>
+Press a switch to select a chord, then touch the pads to play guitar.  Pico guitar sends MIDI NOTE-ON messages to a USB MIDI sound source module.<br/>
+You can assign drum instruments for 6 pads of guitar strings.  So you can play a guitar chord and drums at the same time.<br/>
+If you have guitar chord score files, you can play the music only to press "Next Chord" switch.<br/>
+![picoguitar_top_look.png](https://github.com/ohira-s/PICO_USB_MIDI_INSTRUMENT/blob/master/Docs/picoguitar_top_look.png)
+
 PICO is programmed with circuit python.
 
 # User's Manual
@@ -12,7 +17,7 @@ PICO is programmed with circuit python.
 
 # Software Installation
 1) Copy circuitpython (v9.2.1) into PICO, PICO-W or PICO2.
-2) Copy all file below.
+2) Copy all files below to PICO root.
 - usb_midi_instrument.py as code.py.
 - font5x8.bin.
 - lib folder.
