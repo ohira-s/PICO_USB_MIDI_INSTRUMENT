@@ -71,7 +71,7 @@
 #     1.0.7: 01/21/2025
 #            Drum set editor is available.
 #     1.0.8: 01/22/2025
-#            Music lyrics and strmming lythms descriptions are available.
+#            Music lyrics and strmming timing descriptions are available.
 #########################################################################
 
 import asyncio
@@ -1600,6 +1600,9 @@ class Application_class:
             
         elif sc_mode == self.GUITAR_CONFIG2:
             instrument_guitar.show_info_config2(param, 1)
+            
+        elif sc_mode == self.PLAY_MUSIC:
+            instrument_guitar.show_info_music(param, 1)
 
     # Application task called from asyncio, never call this directly.
     def do_task(self):
