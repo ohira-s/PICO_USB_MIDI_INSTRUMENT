@@ -70,6 +70,8 @@
 #            the chorus does not works properly.
 #     1.0.7: 01/21/2025
 #            Drum set editor is available.
+#     1.0.8: 01/22/2025
+#            Music lyrics and strmming lythms descriptions are available.
 #########################################################################
 
 import asyncio
@@ -79,7 +81,6 @@ from board import *
 import digitalio
 from busio import I2C			# for I2C
 from time import sleep
-#import os, re
 import json
 
 import usb_midi					# for USB MIDI
@@ -96,7 +97,6 @@ import supervisor
 import adafruit_ssd1306			# for SSD1306 OLED Display
 
 from analogio import AnalogIn
-#import math
 
 
 ###############################################
@@ -135,16 +135,6 @@ async def catch_adc_voltage(adc):
         await asyncio.sleep(0.0)
 
 
-#led_status = True
-#async def led_flush():
-#    global led_status, adc0
-#    while True:
-#        led_status = not led_status
-#        pico_led.value = led_status
-#
-#        await asyncio.sleep(1.0)
-
-
 ########################
 ### OLED SSD1306 class
 ########################
@@ -170,9 +160,9 @@ class OLED_SSD1306_class:
     def i2c(self):
         return self._i2c
     
-    def get_display(self):
+#    def get_display(self):
 #        print('DISPLAY')
-        return self._display
+#        return self._display
     
     def width(self):
         return self._width
@@ -201,10 +191,10 @@ class OLED_SSD1306_class:
         if self.is_available():
             self._display.show()
 
-    def clear(self, color=0, refresh=True):
-        self.fill(color)
-        if refresh:
-            self.show()
+#    def clear(self, color=0, refresh=True):
+#        self.fill(color)
+#        if refresh:
+#            self.show()
         
 ################# End of OLED SSD1306 Class Definition #################
 
@@ -216,9 +206,9 @@ _TICKS_PERIOD = const(1<<29)
 _TICKS_MAX = const(_TICKS_PERIOD-1)
 _TICKS_HALFPERIOD = const(_TICKS_PERIOD//2)
 
-def ticks_add(ticks, delta):
+#def ticks_add(ticks, delta):
 #    "Add a delta to a base number of ticks, performing wraparound at 2**29ms."
-    return (ticks + delta) % _TICKS_PERIOD
+#    return (ticks + delta) % _TICKS_PERIOD
 
 def ticks_diff(ticks1, ticks2):
 #    "Compute the signed difference between two ticks values, assuming that they are within 2**28 ticks"
@@ -226,9 +216,9 @@ def ticks_diff(ticks1, ticks2):
     diff = ((diff + _TICKS_HALFPERIOD) & _TICKS_MAX) - _TICKS_HALFPERIOD
     return diff
 
-def ticks_less(ticks1, ticks2):
+#def ticks_less(ticks1, ticks2):
 #    "Return true iff ticks1 is less than ticks2, assuming that they are within 2**28 ticks"
-    return ticks_diff(ticks1, ticks2) < 0
+#    return ticks_diff(ticks1, ticks2) < 0
 
 class ADC_Device_class:
     def __init__(self, adc_pin, adc_name):
@@ -282,8 +272,6 @@ class ADC_Device_class:
 
     def adc_handler(self):
         # Get voltages guitar strings
-##        velo_curve = self.velocity_curve()
-##        velo_factor = math.pow(velo_curve, 5)
         velo_factor = self.velocity_curve()
         for string in list(range(8)):
             voltage_raw = self.get_voltage(string)
@@ -705,7 +693,7 @@ class Guitar_class:
         self.PARAM_GUITAR_OCTAVE = 5
         self.PARAM_GUITAR_ONCHORD = 6
         self.PARAM_GUITAR_DRUM_NAME = 7
-##        self.PARAM_GUITAR_EFFECTOR = 9
+        self.PARAM_MUSIC_INFO = 8
         
         self.value_guitar_root = 0		# Current root
         self.value_guitar_chord = 0		# Current chord
@@ -977,6 +965,24 @@ class Guitar_class:
 #            print(e, self._chord_files[self._chord_file_num][0])
             return self._chord_file_num
 
+    def music_lyric_score(self, file_num, chord_num):
+        lyric = ''
+        score = ''
+        with open('SYNTH/MUSIC/' + self._music_list[self._music_num][0], 'r') as f:
+            json_data = json.load(f)
+            if chord_num < len(json_data['MUSIC']):
+                chord = json_data['MUSIC'][chord_num]
+
+                if len(chord) >= 6:
+                    lyric = chord[5]
+                    if len(chord) >= 7:
+                        score = chord[6]
+
+            else:
+                lyric = '---END---'
+                        
+        return (lyric, score)
+
     def music_file(self, file_num=None):
         if file_num is None or len(self._music_list) <= 0:
             return self._music_num
@@ -1163,7 +1169,7 @@ class Guitar_class:
         else:
 #            chord_note = self._drum_insts[self._drum_set[string]]['NOTE']
             chord_note = self._drum_insts[self._drum_set[string]]
-            print('DRUM NOTE: ', chord_note)
+#            print('DRUM NOTE: ', chord_note)
             capo = 0
             channel = 9		# MIDI drum channel
             
@@ -1342,6 +1348,8 @@ class Guitar_class:
             music_name = self._music_list[self.music_file()][1]
             self._display.show_message('MUSIC: ' + ('---' if self.music_file() < 0 else music_name[0:14]), 0, 9, color)
             self._display.show_message('       ' + ('---' if self.music_file() < 0 else music_name[14:]), 0, 18, color)
+            
+        if param == self.PARAM_ALL or param == self.PARAM_MUSIC_INFO:
             chord = self.music_chord()
             music_len = len(self._music)
             self._display.show_message('PLAY : ' + ('---' if chord < 0 else str(chord + 1) + '/' + str(music_len - 1)), 0, 27, color)
@@ -1350,7 +1358,12 @@ class Guitar_class:
                 on_note = ' on ' + self.PARAM_GUITAR_ROOTs[self.value_guitar_on_note]
             else:
                 on_note = ''
+
             self._display.show_message('CHORD: ' + ('---' if chord < 0 else ('END' if chord == music_len - 1 else self.chord_name()[1] + on_note)), 0, 36, color)
+
+            (lyric, score) = self.music_lyric_score(self.music_file(), self.music_chord())
+            self._display.show_message(lyric, 0, 45, color)
+            self._display.show_message(score, 0, 54, color)
 
         self._display.show()
 
@@ -1498,7 +1511,7 @@ class Guitar_class:
     def do_task_music(self):
         if   input_device.device_info('GUITAR_CHORD_NEXT') == False:
             self.music_chord(self.music_chord() + 1)
-            self.show_info_music(self.PARAM_ALL, 1)
+            self.show_info_music(self.PARAM_MUSIC_INFO, 1)
             
         elif input_device.device_info('GUITAR_MUSIC_PREV') == False:
             self.music_file(self.music_file() - 1)
@@ -1510,15 +1523,15 @@ class Guitar_class:
 
         elif input_device.device_info('GUITAR_CHORD_PREV') == False:
             self.music_chord(self.music_chord() - 1)
-            self.show_info_music(self.PARAM_ALL, 1)
+            self.show_info_music(self.PARAM_MUSIC_INFO, 1)
 
         elif input_device.device_info('GUITAR_CHORD_TOP') == False:
             self.music_chord(0)
-            self.show_info_music(self.PARAM_ALL, 1)
+            self.show_info_music(self.PARAM_MUSIC_INFO, 1)
 
         elif input_device.device_info('GUITAR_CHORD_LAST') == False:
             self.music_chord(-1)
-            self.show_info_music(self.PARAM_ALL, 1)
+            self.show_info_music(self.PARAM_MUSIC_INFO, 1)
         
 ################# End of Guitar Class Definition #################
  
@@ -1699,8 +1712,7 @@ async def main():
     interrupt_task8 = asyncio.create_task(catch_pin_transitions(board.GP5,  'BUTTON_8', input_device.button_pressed, input_device.button_released))
 
     interrupt_adc0  = asyncio.create_task(catch_adc_voltage(adc0))
-#    interrupt_led   = asyncio.create_task(led_flush())
-#    await asyncio.gather(interrupt_task1, interrupt_task2, interrupt_task3, interrupt_task4, interrupt_adc0, interrupt_led)
+
     await asyncio.gather(interrupt_task1, interrupt_task2, interrupt_task3, interrupt_task4, interrupt_adc0)
 
 ######### MAIN ##########
