@@ -263,6 +263,7 @@ You can see the current chord position and the total number of chords separated 
 
 ・CHORD:<br/>
 The current chord to play.<br/>
+Lyrics and timing for playing are appeared if these data were defined.<br/>
 
 ### 9-8. Mode Change
 Press this switch, switch to Chord Play Mode.<br/>
