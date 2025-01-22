@@ -122,7 +122,7 @@ Gun Shot
 <br/>
 ## 6. コードセット定義
 ### 6-1. ファイル
-　SYNTH/CHORD/CHORT_SET_NAME.json<br/>
+　SYNTH/CHORD/CHORD_SET_NAME.json<br/>
 　SYNTH/CHORD/list.json<br/><br/>
 　よく使うコードの組み合わせを定義してCHORD_SET_NAMEの部分に名前を付けて保存します。Pico Guitarのコード設定モードでこのコードセットファイルを指定することでChord Selectorsスイッチ（1〜6x2ページ=12個）にコードが割り当てられます。<br/>
 　list.jsonは、Pico Guitarが参照するコードセット定義ファイル群を列挙したリストファイルす。<br/>
